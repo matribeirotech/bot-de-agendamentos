@@ -1,0 +1,41 @@
+# ========================
+# OS Files
+# ========================
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ========================
+# IDE / Editor
+# ========================
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ========================
+# Python / Django (Backend)
+# ========================
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+env/
+.env
+db.sqlite3
+media/
+staticfiles/
+
+# ========================
+# Node.js (Frontend & Worker)
+# ========================
+node_modules/
+npm-debug.log*
+yarn-error.log*
+whatsapp-worker/auth_info_baileys/
+
+# Build outputs
+dist/
+build/
+.next/
+out/
