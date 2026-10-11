@@ -10,7 +10,7 @@ import { useAppStore } from '../store/useAppStore';
 import { SEGMENTS } from '../lib/segmentSeeds';
 
 export default function BotConfig() {
-  const { businessName, setBusinessName, segment } = useAppStore();
+  const { businessName, setBusinessName, segment, themeColor } = useAppStore();
   const [activeTab, setActiveTab] = useState('messages'); // 'hours' | 'messages' | 'triggers'
   
   // Toggles de Comportamento
@@ -194,16 +194,16 @@ export default function BotConfig() {
       )}
 
       {/* Header Estilo Landing Page Lypsyos */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-2 border-b border-slate-200/60">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-2 border-b border-slate-200/60 dark:border-slate-800">
         <div>
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 border border-blue-100 text-blue-700 text-xs font-semibold tracking-wide uppercase mb-3">
-            <span className="w-2 h-2 rounded-full bg-blue-600"></span>
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-950/50 border border-blue-100 dark:border-blue-900/60 text-blue-700 dark:text-blue-300 text-xs font-semibold tracking-wide uppercase mb-3">
+            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: themeColor || '#2563eb' }}></span>
             Automação WhatsApp & URA Numérica
           </div>
-          <h1 className="text-3xl md:text-4xl font-extrabold text-slate-900 tracking-tight leading-tight">
+          <h1 className="text-3xl md:text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight leading-tight">
             Meu <span className="text-emerald-500">Robô Atendente</span>
           </h1>
-          <p className="text-slate-600 mt-2 text-sm md:text-base max-w-2xl">
+          <p className="text-slate-600 dark:text-slate-400 mt-2 text-sm md:text-base max-w-2xl">
             Configure o fluxo de auto-saudação, atalhos numéricos da URA e regras inteligentes de agendamento automático 24h.
           </p>
         </div>
@@ -211,7 +211,8 @@ export default function BotConfig() {
         <button 
           onClick={handleSave}
           disabled={saving}
-          className="inline-flex items-center justify-center gap-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm px-6 py-3.5 rounded-xl shadow-lg shadow-blue-500/25 active:scale-[0.98] transition-all whitespace-nowrap self-start md:self-auto cursor-pointer disabled:opacity-70"
+          style={{ backgroundColor: themeColor || '#2563eb' }}
+          className="inline-flex items-center justify-center gap-2.5 text-white font-semibold text-sm px-6 py-3.5 rounded-xl shadow-lg shadow-blue-500/25 active:scale-[0.98] transition-all whitespace-nowrap self-start md:self-auto cursor-pointer disabled:opacity-70 hover:opacity-90"
         >
           {saving ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
           {saving ? 'Sincronizando...' : 'Salvar Alterações'}
@@ -219,13 +220,14 @@ export default function BotConfig() {
       </div>
 
       {/* Navegação por Abas (Step-by-step UX) */}
-      <div className="flex items-center gap-2 bg-white p-1.5 rounded-2xl border border-slate-200/80 shadow-sm overflow-x-auto">
+      <div className="flex items-center gap-2 bg-white dark:bg-slate-900 p-1.5 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-x-auto">
         <button
           onClick={() => setActiveTab('messages')}
+          style={activeTab === 'messages' ? { backgroundColor: themeColor || '#2563eb' } : {}}
           className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap ${
             activeTab === 'messages'
-              ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+              ? 'text-white shadow-md shadow-blue-500/20'
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-800'
           }`}
         >
           <MessageSquare className="w-4 h-4" />
@@ -233,10 +235,11 @@ export default function BotConfig() {
         </button>
         <button
           onClick={() => setActiveTab('hours')}
+          style={activeTab === 'hours' ? { backgroundColor: themeColor || '#2563eb' } : {}}
           className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap ${
             activeTab === 'hours'
-              ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+              ? 'text-white shadow-md shadow-blue-500/20'
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-800'
           }`}
         >
           <Clock className="w-4 h-4" />
@@ -244,10 +247,11 @@ export default function BotConfig() {
         </button>
         <button
           onClick={() => setActiveTab('triggers')}
+          style={activeTab === 'triggers' ? { backgroundColor: themeColor || '#2563eb' } : {}}
           className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap ${
             activeTab === 'triggers'
-              ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+              ? 'text-white shadow-md shadow-blue-500/20'
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-800'
           }`}
         >
           <Sparkles className="w-4 h-4" />
@@ -264,21 +268,21 @@ export default function BotConfig() {
           {activeTab === 'messages' && (
             <div className="space-y-6">
               {/* Card de Configuração dos Gatilhos Numéricos */}
-              <div className="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-sm space-y-6">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+              <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 p-6 shadow-sm space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100 dark:border-slate-800">
                   <div>
-                    <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 border border-emerald-100 text-emerald-700 text-[11px] font-bold uppercase tracking-wide mb-1">
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-100 dark:border-emerald-800/60 text-emerald-700 dark:text-emerald-400 text-[11px] font-bold uppercase tracking-wide mb-1">
                       <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
                       Menu Numérico URA
                     </div>
-                    <h3 className="text-lg font-bold text-slate-900">Atalhos do Menu WhatsApp</h3>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      Substitua comandos complicados como <span className="font-mono text-slate-700">#agendar</span> por dígitos diretos no teclado.
+                    <h3 className="text-lg font-bold text-slate-900 dark:text-white">Atalhos do Menu WhatsApp</h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                      Substitua comandos complicados como <span className="font-mono text-slate-700 dark:text-slate-300">#agendar</span> por dígitos diretos no teclado.
                     </p>
                   </div>
                   <button
                     onClick={handleResetTriggers}
-                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-blue-600 bg-slate-50 hover:bg-blue-50 border border-slate-200 rounded-xl px-3 py-2 transition-all cursor-pointer whitespace-nowrap self-start sm:self-auto"
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 bg-slate-50 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 transition-all cursor-pointer whitespace-nowrap self-start sm:self-auto"
                     title="Restaurar gatilhos para 1, 2, 3 e 0"
                   >
                     <RefreshCw className="w-3.5 h-3.5" />
@@ -289,9 +293,9 @@ export default function BotConfig() {
                 {/* Grid dos 4 Gatilhos */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {/* Gatilho 1: Iniciar Agendamento */}
-                  <div className="p-4 bg-gradient-to-br from-blue-50/50 to-indigo-50/30 rounded-2xl border border-blue-100/80 space-y-2">
+                  <div className="p-4 bg-gradient-to-br from-blue-50/50 to-indigo-50/30 dark:from-blue-950/30 dark:to-indigo-950/20 rounded-2xl border border-blue-100/80 dark:border-blue-900/40 space-y-2">
                     <div className="flex items-center justify-between">
-                      <label className="text-xs font-bold uppercase tracking-wider text-blue-900 flex items-center gap-1.5">
+                      <label className="text-xs font-bold uppercase tracking-wider text-blue-900 dark:text-blue-300 flex items-center gap-1.5">
                         <Calendar className="w-3.5 h-3.5 text-blue-600" />
                         Iniciar Agendamento
                       </label>
@@ -305,18 +309,18 @@ export default function BotConfig() {
                         maxLength={5}
                         value={triggerSchedule}
                         onChange={(e) => setTriggerSchedule(e.target.value)}
-                        className="w-16 text-center text-base font-extrabold text-blue-700 bg-white border border-blue-200 rounded-xl p-2 focus:ring-2 focus:ring-blue-500/20 focus:outline-none"
+                        className="w-16 text-center text-base font-extrabold text-blue-700 dark:text-blue-400 bg-white dark:bg-slate-800 border border-blue-200 dark:border-blue-700 rounded-xl p-2 focus:ring-2 focus:ring-blue-500/20 focus:outline-none"
                       />
-                      <div className="text-[11px] text-slate-600 leading-tight">
-                        <span className="font-semibold text-slate-800">Substitui #agendar:</span> Lista os serviços de <strong className="text-blue-700">{currentSegment.title}</strong>.
+                      <div className="text-[11px] text-slate-600 dark:text-slate-300 leading-tight">
+                        <span className="font-semibold text-slate-800 dark:text-white">Substitui #agendar:</span> Lista os serviços de <strong className="text-blue-700 dark:text-blue-400">{currentSegment.title}</strong>.
                       </div>
                     </div>
                   </div>
 
                   {/* Gatilho 0: Finalizar Atendimento */}
-                  <div className="p-4 bg-gradient-to-br from-rose-50/50 to-orange-50/30 rounded-2xl border border-rose-100/80 space-y-2">
+                  <div className="p-4 bg-gradient-to-br from-rose-50/50 to-orange-50/30 dark:from-rose-950/30 dark:to-orange-950/20 rounded-2xl border border-rose-100/80 dark:border-rose-900/40 space-y-2">
                     <div className="flex items-center justify-between">
-                      <label className="text-xs font-bold uppercase tracking-wider text-rose-900 flex items-center gap-1.5">
+                      <label className="text-xs font-bold uppercase tracking-wider text-rose-900 dark:text-rose-300 flex items-center gap-1.5">
                         <LogOut className="w-3.5 h-3.5 text-rose-600" />
                         Finalizar / Sair
                       </label>
@@ -330,22 +334,22 @@ export default function BotConfig() {
                         maxLength={5}
                         value={triggerExit}
                         onChange={(e) => setTriggerExit(e.target.value)}
-                        className="w-16 text-center text-base font-extrabold text-rose-700 bg-white border border-rose-200 rounded-xl p-2 focus:ring-2 focus:ring-rose-500/20 focus:outline-none"
+                        className="w-16 text-center text-base font-extrabold text-rose-700 dark:text-rose-400 bg-white dark:bg-slate-800 border border-rose-200 dark:border-rose-700 rounded-xl p-2 focus:ring-2 focus:ring-rose-500/20 focus:outline-none"
                       />
-                      <div className="text-[11px] text-slate-600 leading-tight">
-                        <span className="font-semibold text-slate-800">Cancela / Encerra:</span> Reseta a conversa com uma mensagem amigável.
+                      <div className="text-[11px] text-slate-600 dark:text-slate-300 leading-tight">
+                        <span className="font-semibold text-slate-800 dark:text-white">Cancela / Encerra:</span> Reseta a conversa com uma mensagem amigável.
                       </div>
                     </div>
                   </div>
 
                   {/* Gatilho 2: Falar com Atendente */}
-                  <div className="p-4 bg-slate-50/90 rounded-2xl border border-slate-200/80 space-y-2">
+                  <div className="p-4 bg-slate-50/90 dark:bg-slate-800/60 rounded-2xl border border-slate-200/80 dark:border-slate-700 space-y-2">
                     <div className="flex items-center justify-between">
-                      <label className="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
-                        <Headphones className="w-3.5 h-3.5 text-slate-600" />
+                      <label className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                        <Headphones className="w-3.5 h-3.5 text-slate-600 dark:text-slate-400" />
                         Falar com Atendente
                       </label>
-                      <span className="text-[10px] font-bold bg-slate-200 text-slate-700 px-2 py-0.5 rounded-full">
+                      <span className="text-[10px] font-bold bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 px-2 py-0.5 rounded-full">
                         Transbordo
                       </span>
                     </div>
@@ -355,22 +359,22 @@ export default function BotConfig() {
                         maxLength={5}
                         value={triggerAttendant}
                         onChange={(e) => setTriggerAttendant(e.target.value)}
-                        className="w-16 text-center text-base font-extrabold text-slate-800 bg-white border border-slate-200 rounded-xl p-2 focus:ring-2 focus:ring-slate-400/20 focus:outline-none"
+                        className="w-16 text-center text-base font-extrabold text-slate-800 dark:text-white bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-2 focus:ring-2 focus:ring-slate-400/20 focus:outline-none"
                       />
-                      <div className="text-[11px] text-slate-500 leading-tight">
+                      <div className="text-[11px] text-slate-500 dark:text-slate-400 leading-tight">
                         Pausa o robô e direciona para atendimento humano manual.
                       </div>
                     </div>
                   </div>
 
                   {/* Gatilho 3: Endereço & Localização */}
-                  <div className="p-4 bg-slate-50/90 rounded-2xl border border-slate-200/80 space-y-2">
+                  <div className="p-4 bg-slate-50/90 dark:bg-slate-800/60 rounded-2xl border border-slate-200/80 dark:border-slate-700 space-y-2">
                     <div className="flex items-center justify-between">
-                      <label className="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
-                        <MapPin className="w-3.5 h-3.5 text-slate-600" />
+                      <label className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                        <MapPin className="w-3.5 h-3.5 text-slate-600 dark:text-slate-400" />
                         Endereço & Localização
                       </label>
-                      <span className="text-[10px] font-bold bg-slate-200 text-slate-700 px-2 py-0.5 rounded-full">
+                      <span className="text-[10px] font-bold bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 px-2 py-0.5 rounded-full">
                         Informativo
                       </span>
                     </div>
@@ -380,9 +384,9 @@ export default function BotConfig() {
                         maxLength={5}
                         value={triggerLocation}
                         onChange={(e) => setTriggerLocation(e.target.value)}
-                        className="w-16 text-center text-base font-extrabold text-slate-800 bg-white border border-slate-200 rounded-xl p-2 focus:ring-2 focus:ring-slate-400/20 focus:outline-none"
+                        className="w-16 text-center text-base font-extrabold text-slate-800 dark:text-white bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-2 focus:ring-2 focus:ring-slate-400/20 focus:outline-none"
                       />
-                      <div className="text-[11px] text-slate-500 leading-tight">
+                      <div className="text-[11px] text-slate-500 dark:text-slate-400 leading-tight">
                         Informa o endereço do estabelecimento e pontos de referência.
                       </div>
                     </div>
@@ -392,10 +396,10 @@ export default function BotConfig() {
                 {/* Mensagem de Saudação & Variáveis */}
                 <div className="pt-2 space-y-2">
                   <div className="flex items-center justify-between">
-                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
                       Mensagem de Saudação & Menu Principal
                     </label>
-                    <span className="text-[11px] text-slate-400 font-medium">
+                    <span className="text-[11px] text-slate-400 dark:text-slate-500 font-medium">
                       Suporta variáveis: {'{estabelecimento}'}, {'{opcao_agendar}'}
                     </span>
                   </div>
@@ -403,27 +407,27 @@ export default function BotConfig() {
                     rows={7}
                     value={greeting}
                     onChange={(e) => setGreeting(e.target.value)}
-                    className="w-full text-xs p-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all text-slate-800 font-mono leading-relaxed"
+                    className="w-full text-xs p-3.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all text-slate-800 dark:text-slate-100 font-mono leading-relaxed"
                   />
-                  <p className="text-[11px] text-slate-500">
-                    💡 O robô substitui automaticamente <code className="bg-slate-100 text-blue-700 px-1 py-0.5 rounded">*{'{opcao_agendar}'}*</code> pelo atalho definido acima (atualmente <strong className="text-slate-800">*{triggerSchedule}*</strong>).
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    💡 O robô substitui automaticamente <code className="bg-slate-100 dark:bg-slate-800 text-blue-700 dark:text-blue-400 px-1 py-0.5 rounded">*{'{opcao_agendar}'}*</code> pelo atalho definido acima (atualmente <strong className="text-slate-800 dark:text-white">*{triggerSchedule}*</strong>).
                   </p>
                 </div>
               </div>
 
               {/* Accordion: Configurações Avançadas de Conversa */}
-              <div className="bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden">
+              <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-hidden">
                 <button
                   onClick={() => setIsAdvancedOpen(!isAdvancedOpen)}
-                  className="w-full p-5 flex items-center justify-between bg-slate-50/50 hover:bg-slate-50 transition-colors text-left cursor-pointer"
+                  className="w-full p-5 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/40 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors text-left cursor-pointer"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="p-2 bg-blue-50 rounded-xl border border-blue-100 text-blue-600">
+                    <div className="p-2 bg-blue-50 dark:bg-blue-950/60 rounded-xl border border-blue-100 dark:border-blue-900/60 text-blue-600 dark:text-blue-400">
                       <Sliders className="w-5 h-5" />
                     </div>
                     <div>
-                      <h4 className="text-sm font-bold text-slate-900">Configurações Avançadas de Conversa</h4>
-                      <p className="text-xs text-slate-500">
+                      <h4 className="text-sm font-bold text-slate-900 dark:text-white">Configurações Avançadas de Conversa</h4>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
                         Auto-saudação no primeiro contato, proteção de agenda pessoal e horário de ausência.
                       </p>
                     </div>
@@ -436,18 +440,18 @@ export default function BotConfig() {
                     {/* Toggle: Auto-Greeting */}
                     <div className="pt-2 flex items-start justify-between gap-4">
                       <div className="space-y-1">
-                        <span className="text-xs font-bold uppercase tracking-wider text-slate-900 flex items-center gap-1.5">
+                        <span className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-white flex items-center gap-1.5">
                           <Sparkles className="w-4 h-4 text-emerald-500" />
                           Auto-Greeting (Saudação Automática no 1º Contato)
                         </span>
-                        <p className="text-xs text-slate-500">
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
                           Ao receber qualquer primeira mensagem (ex: "Oi", "Boa tarde", ou áudio), o bot responde imediatamente com a mensagem de saudação e a URA numérica.
                         </p>
                       </div>
                       <button
                         onClick={() => setAutoGreeting(!autoGreeting)}
                         className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors cursor-pointer flex-shrink-0 ${
-                          autoGreeting ? 'bg-emerald-500' : 'bg-slate-200'
+                          autoGreeting ? 'bg-emerald-500' : 'bg-slate-200 dark:bg-slate-700'
                         }`}
                       >
                         <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${
@@ -459,18 +463,18 @@ export default function BotConfig() {
                     {/* Toggle: Filtro de Privacidade (Ignorar Agenda Pessoal) */}
                     <div className="pt-4 flex items-start justify-between gap-4">
                       <div className="space-y-1">
-                        <span className="text-xs font-bold uppercase tracking-wider text-slate-900 flex items-center gap-1.5">
-                          <UserCheck className="w-4 h-4 text-blue-600" />
+                        <span className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-white flex items-center gap-1.5">
+                          <UserCheck className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                           Filtro de Privacidade (Ignorar Agenda Pessoal)
                         </span>
-                        <p className="text-xs text-slate-500">
-                          Se você utiliza seu WhatsApp pessoal para trabalho, o robô <strong className="text-slate-800">não responde</strong> automaticamente a contatos que já estejam salvos na sua agenda (permanece em silêncio absoluto). Para agendar, o contato salvo precisa digitar explicitamente <code className="bg-slate-100 text-blue-700 px-1 py-0.5 rounded font-mono font-bold">/agendar</code>.
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                          Se você utiliza seu WhatsApp pessoal para trabalho, o robô <strong className="text-slate-800 dark:text-white">não responde</strong> automaticamente a contatos que já estejam salvos na sua agenda (permanece em silêncio absoluto). Para agendar, o contato salvo precisa digitar explicitamente <code className="bg-slate-100 dark:bg-slate-800 text-blue-700 dark:text-blue-400 px-1 py-0.5 rounded font-mono font-bold">/agendar</code>.
                         </p>
                       </div>
                       <button
                         onClick={() => setIgnoreSavedContacts(!ignoreSavedContacts)}
                         className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors cursor-pointer flex-shrink-0 ${
-                          ignoreSavedContacts ? 'bg-blue-600' : 'bg-slate-200'
+                          ignoreSavedContacts ? 'bg-blue-600' : 'bg-slate-200 dark:bg-slate-700'
                         }`}
                       >
                         <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${
@@ -482,18 +486,18 @@ export default function BotConfig() {
                     {/* Toggle: Modo Ausência Fora de Expediente */}
                     <div className="pt-4 flex items-start justify-between gap-4">
                       <div className="space-y-1">
-                        <span className="text-xs font-bold uppercase tracking-wider text-slate-900 flex items-center gap-1.5">
+                        <span className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-white flex items-center gap-1.5">
                           <Clock className="w-4 h-4 text-amber-500" />
                           Resposta Automática Fora do Expediente
                         </span>
-                        <p className="text-xs text-slate-500">
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
                           Envia a mensagem de ausência durante a noite ou feriados quando o estabelecimento estiver fechado.
                         </p>
                       </div>
                       <button
                         onClick={() => setOutOfOfficeEnabled(!outOfOfficeEnabled)}
                         className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors cursor-pointer flex-shrink-0 ${
-                          outOfOfficeEnabled ? 'bg-amber-500' : 'bg-slate-200'
+                          outOfOfficeEnabled ? 'bg-amber-500' : 'bg-slate-200 dark:bg-slate-700'
                         }`}
                       >
                         <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${
@@ -509,75 +513,75 @@ export default function BotConfig() {
 
           {/* ABA 2: HORÁRIO DE ATENDIMENTO */}
           {activeTab === 'hours' && (
-            <div className="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-sm space-y-6">
+            <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 p-6 shadow-sm space-y-6">
               <div>
-                <h3 className="text-lg font-bold text-slate-900">Expediente Semanal</h3>
-                <p className="text-xs text-slate-500 mt-1">
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white">Expediente Semanal</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                   O bot usa esses horários para nunca agendar clientes em momentos de folga ou durante o almoço.
                 </p>
               </div>
 
-              <div className="divide-y divide-slate-100">
+              <div className="divide-y divide-slate-100 dark:divide-slate-800">
                 {businessHours.map((bh, idx) => (
                   <div key={bh.key} className="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div className="flex items-center gap-3 w-40">
                       <button
                         onClick={() => updateHour(idx, 'open', !bh.open)}
                         className={`w-10 h-6 flex items-center rounded-full p-1 transition-colors cursor-pointer ${
-                          bh.open ? 'bg-emerald-500' : 'bg-slate-200'
+                          bh.open ? 'bg-emerald-500' : 'bg-slate-200 dark:bg-slate-700'
                         }`}
                       >
                         <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${
                           bh.open ? 'translate-x-4' : 'translate-x-0'
                         }`} />
                       </button>
-                      <span className={`text-sm font-semibold ${bh.open ? 'text-slate-900' : 'text-slate-400 line-through'}`}>
+                      <span className={`text-sm font-semibold ${bh.open ? 'text-slate-900 dark:text-white' : 'text-slate-400 dark:text-slate-500 line-through'}`}>
                         {bh.day}
                       </span>
                     </div>
 
                     {bh.open ? (
                       <div className="flex flex-wrap items-center gap-2.5 text-xs">
-                        <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5">
-                          <span className="text-slate-500 font-medium">Abre:</span>
+                        <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-2.5 py-1.5">
+                          <span className="text-slate-500 dark:text-slate-400 font-medium">Abre:</span>
                           <input 
                             type="time" 
                             value={bh.start}
                             onChange={(e) => updateHour(idx, 'start', e.target.value)}
-                            className="bg-transparent font-bold text-slate-800 focus:outline-none"
+                            className="bg-transparent font-bold text-slate-800 dark:text-white focus:outline-none"
                           />
                         </div>
-                        <span className="text-slate-300">até</span>
-                        <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5">
-                          <span className="text-slate-500 font-medium">Fecha:</span>
+                        <span className="text-slate-300 dark:text-slate-600">até</span>
+                        <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-2.5 py-1.5">
+                          <span className="text-slate-500 dark:text-slate-400 font-medium">Fecha:</span>
                           <input 
                             type="time" 
                             value={bh.end}
                             onChange={(e) => updateHour(idx, 'end', e.target.value)}
-                            className="bg-transparent font-bold text-slate-800 focus:outline-none"
+                            className="bg-transparent font-bold text-slate-800 dark:text-white focus:outline-none"
                           />
                         </div>
 
                         {/* Pausa Almoço */}
-                        <div className="flex items-center gap-1 text-[11px] text-slate-500 bg-blue-50/70 border border-blue-100 rounded-xl px-2 py-1.5 ml-1">
-                          <span className="font-semibold text-blue-700">Almoço:</span>
+                        <div className="flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400 bg-blue-50/70 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-900/60 rounded-xl px-2 py-1.5 ml-1">
+                          <span className="font-semibold text-blue-700 dark:text-blue-300">Almoço:</span>
                           <input 
                             type="time" 
                             value={bh.breakStart}
                             onChange={(e) => updateHour(idx, 'breakStart', e.target.value)}
-                            className="bg-transparent text-blue-900 font-semibold focus:outline-none w-14"
+                            className="bg-transparent text-blue-900 dark:text-blue-200 font-semibold focus:outline-none w-14"
                           />
                           <span>-</span>
                           <input 
                             type="time" 
                             value={bh.breakEnd}
                             onChange={(e) => updateHour(idx, 'breakEnd', e.target.value)}
-                            className="bg-transparent text-blue-900 font-semibold focus:outline-none w-14"
+                            className="bg-transparent text-blue-900 dark:text-blue-200 font-semibold focus:outline-none w-14"
                           />
                         </div>
                       </div>
                     ) : (
-                      <span className="text-xs font-semibold text-slate-400 bg-slate-50 px-3 py-1.5 rounded-xl">
+                      <span className="text-xs font-semibold text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-slate-800 px-3 py-1.5 rounded-xl">
                         Fechado (O bot avisa que você está de folga)
                       </span>
                     )}
@@ -586,15 +590,15 @@ export default function BotConfig() {
               </div>
 
               {/* Mensagem de Ausência */}
-              <div className="pt-4 border-t border-slate-100 space-y-2">
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+              <div className="pt-4 border-t border-slate-100 dark:border-slate-800 space-y-2">
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
                   Mensagem Automática Fora do Horário Comercial
                 </label>
                 <textarea
                   rows={3}
                   value={absenceMessage}
                   onChange={(e) => setAbsenceMessage(e.target.value)}
-                  className="w-full text-xs p-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all text-slate-800"
+                  className="w-full text-xs p-3.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all text-slate-800 dark:text-slate-100"
                 />
               </div>
             </div>
@@ -602,17 +606,17 @@ export default function BotConfig() {
 
           {/* ABA 3: RESPOSTAS RÁPIDAS (FAQ) */}
           {activeTab === 'triggers' && (
-            <div className="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-sm space-y-6">
+            <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 p-6 shadow-sm space-y-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-lg font-bold text-slate-900">Respostas Rápidas (Palavras-Chave)</h3>
-                  <p className="text-xs text-slate-500 mt-1">
+                  <h3 className="text-lg font-bold text-slate-900 dark:text-white">Respostas Rápidas (Palavras-Chave)</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                     Quando o cliente mandar essas palavras específicas, o robô responde instantaneamente.
                   </p>
                 </div>
                 <button 
                   onClick={() => setCustomResponses([...customResponses, { id: Date.now(), trigger: '', response: '' }])}
-                  className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 font-bold text-xs px-3 py-2 rounded-xl border border-blue-200 transition-colors cursor-pointer"
+                  className="inline-flex items-center gap-1.5 bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/60 font-bold text-xs px-3 py-2 rounded-xl border border-blue-200 dark:border-blue-900/40 transition-colors cursor-pointer"
                 >
                   <Plus className="w-3.5 h-3.5" /> Adicionar Gatilho
                 </button>
@@ -620,10 +624,10 @@ export default function BotConfig() {
 
               <div className="space-y-3">
                 {customResponses.map((item, index) => (
-                  <div key={item.id} className="p-4 bg-slate-50/80 rounded-2xl border border-slate-200/80 space-y-2">
+                  <div key={item.id} className="p-4 bg-slate-50/80 dark:bg-slate-800/50 rounded-2xl border border-slate-200/80 dark:border-slate-700 space-y-2">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <span className="text-[11px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-lg border border-blue-100">
+                        <span className="text-[11px] font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 rounded-lg border border-blue-100 dark:border-blue-900/60">
                           Se o cliente disser:
                         </span>
                         <input
@@ -635,7 +639,7 @@ export default function BotConfig() {
                             updated[index].trigger = e.target.value;
                             setCustomResponses(updated);
                           }}
-                          className="text-xs font-bold text-slate-900 bg-white border border-slate-200 px-2.5 py-1 rounded-lg focus:outline-none"
+                          className="text-xs font-bold text-slate-900 dark:text-white bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-2.5 py-1 rounded-lg focus:outline-none"
                         />
                       </div>
                       <button 
@@ -654,7 +658,7 @@ export default function BotConfig() {
                         updated[index].response = e.target.value;
                         setCustomResponses(updated);
                       }}
-                      className="w-full text-xs p-2.5 bg-white border border-slate-200 rounded-xl focus:outline-none text-slate-800"
+                      className="w-full text-xs p-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none text-slate-800 dark:text-slate-100"
                     />
                   </div>
                 ))}
