@@ -51,7 +51,8 @@ services:
       context: ./whatsapp-worker
       dockerfile: Dockerfile
     volumes:
-      - ./whatsapp-worker/auth_info_baileys:/app/auth_info_baileys
+      - ./whatsapp-worker:/app
+      - /app/node_modules
     ports:
       - "3001:3001"
     environment:

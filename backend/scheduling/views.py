@@ -99,3 +99,10 @@ class AppointmentViewSet(TenantAwareViewSetMixin, viewsets.ModelViewSet):
             })
         except Exception as e:
             return Response({"error": str(e)}, status=400)
+
+    @action(detail=True, methods=['post', 'patch'])
+    def cancel(self, request, pk=None):
+        appointment = self.get_object()
+        appointment.status = 'CANCELLED'
+        appointment.save()
+        return Response({'status': 'CANCELLED', 'message': 'Agendamento cancelado com sucesso.'})
