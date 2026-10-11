@@ -1,8 +1,15 @@
 import { useState } from 'react';
-import { Send, Users, Image as ImageIcon, Smile, MessageSquare, AlertCircle, Megaphone, Sparkles, CheckCircle2 } from 'lucide-react';
+import { Send, Users, Sparkles, CheckCircle2 } from 'lucide-react';
+import { useAppStore } from '../store/useAppStore';
+import { SEGMENTS } from '../lib/segmentSeeds';
 
 export default function Marketing() {
-  const [message, setMessage] = useState('Olá {nome_cliente}! 💅 Temos horários especiais com desconto nesta quinta e sexta para Manicure e Pedicure. Quer garantir o seu horário? Responda com *#agendar*!');
+  const { businessName, segment } = useAppStore();
+  const segmentObj = SEGMENTS.find(s => s.id === segment) || SEGMENTS[0];
+
+  const [message, setMessage] = useState(
+    `Olá {nome_cliente}! 👋 Temos horários especiais nesta semana em *${businessName || 'nosso espaço'}*. Quer garantir o seu procedimento? Responda com *1* para agendar!`
+  );
   const [targetAudience, setTargetAudience] = useState('all');
 
   const handleSendBroadcast = (e) => {
@@ -11,7 +18,7 @@ export default function Marketing() {
       alert("Digite uma mensagem para enviar.");
       return;
     }
-    alert(`📢 Disparo em massa Lypsyos iniciado!\n\nPúblico-alvo: ${targetAudience === 'all' ? 'Todos os clientes (base completa)' : targetAudience === 'active' ? 'Clientes ativos (últimos 30 dias)' : 'Clientes ausentes (+30 dias sem agendar)'}\n\nMensagem pronta para envio via WhatsApp!`);
+    alert(`📢 Disparo em massa iniciado!\n\nEstabelecimento: ${businessName || 'Meu Estabelecimento'}\nPúblico-alvo: ${targetAudience === 'all' ? 'Todos os clientes (base completa)' : targetAudience === 'active' ? 'Clientes ativos (últimos 30 dias)' : 'Clientes ausentes (+30 dias sem agendar)'}\n\nMensagem pronta para envio via WhatsApp!`);
   };
 
   const insertVariable = (variable) => {
@@ -46,7 +53,7 @@ export default function Marketing() {
                 </label>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <label 
-                    className={`cursor-pointer border rounded-2xl p-4 flex flex-col items-center gap-2 transition-all cursor-pointer ${
+                    className={`cursor-pointer border rounded-2xl p-4 flex flex-col items-center gap-2 transition-all ${
                       targetAudience === 'all' 
                         ? 'border-blue-600 bg-blue-50/70 text-blue-700 font-semibold shadow-xs' 
                         : 'border-slate-200 hover:bg-slate-50 text-slate-600'
@@ -59,7 +66,7 @@ export default function Marketing() {
                   </label>
 
                   <label 
-                    className={`cursor-pointer border rounded-2xl p-4 flex flex-col items-center gap-2 transition-all cursor-pointer ${
+                    className={`cursor-pointer border rounded-2xl p-4 flex flex-col items-center gap-2 transition-all ${
                       targetAudience === 'active' 
                         ? 'border-blue-600 bg-blue-50/70 text-blue-700 font-semibold shadow-xs' 
                         : 'border-slate-200 hover:bg-slate-50 text-slate-600'
@@ -72,7 +79,7 @@ export default function Marketing() {
                   </label>
 
                   <label 
-                    className={`cursor-pointer border rounded-2xl p-4 flex flex-col items-center gap-2 transition-all cursor-pointer ${
+                    className={`cursor-pointer border rounded-2xl p-4 flex flex-col items-center gap-2 transition-all ${
                       targetAudience === 'inactive' 
                         ? 'border-blue-600 bg-blue-50/70 text-blue-700 font-semibold shadow-xs' 
                         : 'border-slate-200 hover:bg-slate-50 text-slate-600'
@@ -103,10 +110,10 @@ export default function Marketing() {
                     </button>
                     <button 
                       type="button" 
-                      onClick={() => insertVariable(' *#agendar*')}
+                      onClick={() => insertVariable(' *1*')}
                       className="text-[11px] font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-2.5 py-1 rounded-lg border border-emerald-200 transition-colors cursor-pointer"
                     >
-                      + #agendar
+                      + Digite 1 (Agendar)
                     </button>
                   </div>
                 </div>
@@ -156,11 +163,11 @@ export default function Marketing() {
               
               {/* Header WhatsApp */}
               <div className="bg-[#075E54] text-white p-3 rounded-2xl flex items-center gap-2.5 shadow-sm">
-                <div className="w-8 h-8 rounded-full bg-slate-300 flex items-center justify-center text-xs font-bold text-slate-700 overflow-hidden">
-                  💅
+                <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold text-slate-700 overflow-hidden">
+                  {segmentObj?.icon || '🏪'}
                 </div>
-                <div>
-                  <p className="font-bold text-xs leading-tight">Lypsyos Salão</p>
+                <div className="overflow-hidden">
+                  <p className="font-bold text-xs leading-tight truncate">{businessName || 'Meu Estabelecimento'}</p>
                   <p className="text-[10px] text-emerald-200">Mensagem Oficial</p>
                 </div>
               </div>

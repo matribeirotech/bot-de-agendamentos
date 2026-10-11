@@ -18,6 +18,7 @@ class Appointment(models.Model):
         ('PENDING', 'Pendente'),
         ('CONFIRMED', 'Confirmado'),
         ('CANCELED', 'Cancelado'),
+        ('CANCELLED', 'Cancelado'),
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

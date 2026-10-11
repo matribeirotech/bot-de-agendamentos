@@ -9,6 +9,7 @@ class BotState(models.Model):
         ('AWAITING_SERVICE', 'Aguardando Seleção de Serviço'),
         ('AWAITING_DATE', 'Aguardando Data'),
         ('AWAITING_TIME', 'Aguardando Horário'),
+        ('AWAITING_PHONE', 'Aguardando Telefone do Cliente'),
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -30,12 +31,20 @@ class BotConfiguration(models.Model):
     auto_reply_enabled = models.BooleanField(default=True, help_text="Ativa o fluxo automático de agendamento")
     out_of_office_enabled = models.BooleanField(default=False, help_text="Ativa resposta automática de ausência")
     
+    # Gatilhos e Atalhos Numéricos do Menu URA
+    trigger_schedule = models.CharField(max_length=20, default='1', help_text="Atalho para iniciar agendamento")
+    trigger_attendant = models.CharField(max_length=20, default='2', help_text="Atalho para falar com atendente")
+    trigger_location = models.CharField(max_length=20, default='3', help_text="Atalho para endereço/localização")
+    trigger_exit = models.CharField(max_length=20, default='0', help_text="Atalho para finalizar atendimento")
+    auto_greeting = models.BooleanField(default=True, help_text="Dispara saudação automática a qualquer mensagem")
+    ignore_saved_contacts = models.BooleanField(default=False, help_text="Ignora contatos salvos da agenda pessoal")
+    
     # Mensagens Padrão (com suporte a variáveis como {tenant_name}, {client_name}, {date}, {time})
     greeting_message = models.TextField(
-        default="Olá! 👋 Bem-vindo(a) à {tenant_name}. Como posso ajudar hoje?\nDigite #agendar para marcar um horário."
+        default="Olá! 👋 Bem-vindo(a) à {tenant_name}.\n\nComo posso ajudar você hoje?\n\n*1* - Iniciar agendamento\n*2* - Falar com atendente\n*3* - Endereço & Localização\n*0* - Finalizar atendimento\n\nDigite o número da opção desejada:"
     )
     absence_message = models.TextField(
-        default="No momento estamos fora do nosso horário de atendimento. 🌙 Deixe sua mensagem e retornaremos em breve!"
+        default="No momento estamos fora do nosso horário de atendimento. 🌙 Deixe sua mensagem ou digite *1* para agendar um horário para o próximo dia útil!"
     )
     confirmation_message = models.TextField(
         default="✅ Tudo certo, {client_name}! Seu agendamento para {service_name} foi confirmado para {date} às {time}."

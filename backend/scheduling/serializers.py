@@ -13,6 +13,12 @@ class AppointmentSerializer(serializers.ModelSerializer):
         model = Appointment
         fields = ['id', 'client', 'service', 'start_time', 'end_time', 'status', 'google_event_id', 'created_at']
         read_only_fields = ['id', 'google_event_id', 'created_at']
+        extra_kwargs = {
+            'client': {'required': False},
+            'service': {'required': False},
+            'start_time': {'required': False},
+            'end_time': {'required': False},
+        }
 
 class AppointmentReadSerializer(AppointmentSerializer):
     client = ClientSerializer(read_only=True)

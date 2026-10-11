@@ -75,7 +75,7 @@ export default function Settings() {
                 <div>
                   <p className="font-bold text-sm text-emerald-900">Robô Ativo e Respondendo</p>
                   <p className="text-xs text-emerald-700 mt-0.5">
-                    Clientes que enviarem mensagens ou digitarem <strong>#agendar</strong> serão atendidos na hora.
+                    Atendimento automático com URA interativa ativo. Contatos da sua agenda pessoal são protegidos pelo filtro de privacidade.
                   </p>
                 </div>
               </div>
