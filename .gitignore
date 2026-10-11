@@ -39,3 +39,7 @@ dist/
 build/
 .next/
 out/
+
+# Database / SQL Scripts
+*.sql
+
