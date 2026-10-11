@@ -94,7 +94,8 @@ export default function Login() {
         if (error) throw error;
 
         // Sincroniza imediatamente o perfil do usuário logado
-        await useAppStore.getState().loadUserProfile(email);
+        const loggedEmail = data?.user?.email || email;
+        await useAppStore.getState().loadUserProfile(loggedEmail);
 
         navigate('/');
       }

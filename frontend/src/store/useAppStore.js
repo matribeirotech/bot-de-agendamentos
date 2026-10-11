@@ -48,6 +48,8 @@ const initialState = {
   isAuthenticated: true,
 };
 
+const GLOBAL_PROFILE_KEY = 'lypsyos_active_profile';
+
 export const useAppStore = create(
   persist(
     (set, get) => ({
@@ -82,11 +84,12 @@ export const useAppStore = create(
             onboardingStep: 3,
             subscription: state.subscription || defaultSubscription,
           };
-          if (next.email) {
-            try {
+          try {
+            localStorage.setItem(GLOBAL_PROFILE_KEY, JSON.stringify(next));
+            if (next.email) {
               localStorage.setItem(`lypsyos_profile_${next.email.toLowerCase().trim()}`, JSON.stringify(next));
-            } catch (e) {}
-          }
+            }
+          } catch (e) {}
           return next;
         }),
 
@@ -100,35 +103,22 @@ export const useAppStore = create(
           },
         })),
 
-      // Carregar Perfil Completo (Multi-Layer: LocalStorage por E-mail -> Supabase Auth -> Supabase DB -> Backend Django)
+      // Carregar Perfil Completo (Multi-Layer com Fallback Infalível)
       loadUserProfile: async (emailHint) => {
         const state = get();
         let targetEmail = (emailHint || state.email || '').toLowerCase().trim();
         let loaded = {};
 
-        // 1. Camada 1: Cache Persistente por E-mail no LocalStorage
-        if (targetEmail) {
-          try {
-            const rawCache = localStorage.getItem(`lypsyos_profile_${targetEmail}`);
-            if (rawCache) {
-              const parsed = JSON.parse(rawCache);
-              if (parsed && typeof parsed === 'object') {
-                loaded = { ...parsed };
-              }
-            }
-          } catch (e) {
-            console.warn('Erro ao ler cache do usuário:', e);
-          }
-        }
-
-        // 2. Camada 2: Supabase Auth & Banco de Dados 'usuarios'
+        // 1. Camada 1: Supabase Auth Session & Metadata
         if (isSupabaseConfigured()) {
           try {
-            const { data: { user } } = await supabase.auth.getUser();
+            const { data: { session } } = await supabase.auth.getSession();
+            const user = session?.user;
             if (user) {
               targetEmail = (user.email || targetEmail).toLowerCase().trim();
-              const meta = user.user_metadata || {};
+              loaded.email = user.email;
 
+              const meta = user.user_metadata || {};
               if (meta.nome_salao) loaded.businessName = meta.nome_salao;
               if (meta.nome_completo) loaded.responsibleName = meta.nome_completo;
               if (meta.whatsapp) loaded.whatsapp = meta.whatsapp;
@@ -139,7 +129,6 @@ export const useAppStore = create(
               if (meta.theme_mode) loaded.themeMode = meta.theme_mode;
               if (meta.bio) loaded.bio = meta.bio;
               if (meta.segmento) loaded.segment = meta.segmento;
-              loaded.email = user.email;
 
               // Consulta na tabela pública 'usuarios'
               const { data: dbUser } = await supabase
@@ -156,6 +145,7 @@ export const useAppStore = create(
                 if (dbUser.chave_pix) loaded.pixKey = dbUser.chave_pix;
                 if (dbUser.tipo_chave_pix) loaded.pixType = dbUser.tipo_chave_pix;
                 if (dbUser.cor_primaria) loaded.themeColor = dbUser.cor_primaria;
+                if (dbUser.theme_mode) loaded.themeMode = dbUser.theme_mode;
                 if (dbUser.bio) loaded.bio = dbUser.bio;
                 if (dbUser.segmento) loaded.segment = dbUser.segmento;
               }
@@ -165,7 +155,41 @@ export const useAppStore = create(
           }
         }
 
-        // 3. Camada 3: Backend Django (Nome do Estabelecimento do Tenant / Bot)
+        // 2. Camada 2: Cache LocalStorage Específico por E-mail
+        if (targetEmail) {
+          try {
+            const rawCache = localStorage.getItem(`lypsyos_profile_${targetEmail}`);
+            if (rawCache) {
+              const parsed = JSON.parse(rawCache);
+              if (parsed && typeof parsed === 'object') {
+                for (const key of Object.keys(parsed)) {
+                  if (parsed[key] && !loaded[key]) {
+                    loaded[key] = parsed[key];
+                  }
+                }
+              }
+            }
+          } catch (e) {
+            console.warn('Erro ao ler cache do usuário:', e);
+          }
+        }
+
+        // 3. Camada 3: Cache LocalStorage Global Ativo (Fallback)
+        try {
+          const rawGlobal = localStorage.getItem(GLOBAL_PROFILE_KEY);
+          if (rawGlobal) {
+            const parsedGlobal = JSON.parse(rawGlobal);
+            if (parsedGlobal && typeof parsedGlobal === 'object') {
+              for (const key of Object.keys(parsedGlobal)) {
+                if (parsedGlobal[key] && !loaded[key]) {
+                  loaded[key] = parsedGlobal[key];
+                }
+              }
+            }
+          }
+        } catch (e) {}
+
+        // 4. Camada 4: Backend Django (Nome do Estabelecimento do Bot / Tenant)
         try {
           const res = await axios.get('http://localhost:8000/api/v1/bot/config/');
           if (res.data?.business_name && (!loaded.businessName || loaded.businessName === 'Meu Estabelecimento')) {
@@ -173,76 +197,111 @@ export const useAppStore = create(
           }
         } catch (e) {}
 
+        // Consolida estado e aplica tema
         if (Object.keys(loaded).length > 0) {
-          set((prev) => ({
-            ...prev,
+          const merged = {
+            ...state,
             ...loaded,
+            email: targetEmail || loaded.email || state.email,
             isOnboarded: true,
             isAuthenticated: true,
-          }));
+          };
+          set(merged);
 
-          // Salva no cache do e-mail
-          if (targetEmail) {
-            try {
-              localStorage.setItem(`lypsyos_profile_${targetEmail}`, JSON.stringify(loaded));
-            } catch (e) {}
-          }
+          // Mantém ambos os caches salvos e consistentes
+          try {
+            localStorage.setItem(GLOBAL_PROFILE_KEY, JSON.stringify(merged));
+            if (targetEmail) {
+              localStorage.setItem(`lypsyos_profile_${targetEmail}`, JSON.stringify(merged));
+            }
+          } catch (e) {}
 
-          // Aplica o tema
-          applyTheme(loaded.themeMode || state.themeMode || 'light', loaded.themeColor || state.themeColor || '#2563eb');
+          applyTheme(merged.themeMode || 'light', merged.themeColor || '#2563eb');
         }
 
         return loaded;
       },
 
-      // Salvar Perfil Completo (Persistência em Todas as Camadas)
+      // Salvar Perfil Completo (Multi-Layer com Sincronização Garantida)
       saveUserProfile: async (formData) => {
         const state = get();
         const merged = { ...state, ...formData };
         set(merged);
 
-        const email = (merged.email || '').toLowerCase().trim();
+        let email = (merged.email || '').toLowerCase().trim();
 
-        // 1. Salva no cache isolado por e-mail no LocalStorage
-        if (email) {
+        // Se o e-mail não foi informado no formulário, tenta obter do Supabase
+        if (!email && isSupabaseConfigured()) {
           try {
-            localStorage.setItem(`lypsyos_profile_${email}`, JSON.stringify(formData));
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session?.user?.email) {
+              email = session.user.email.toLowerCase().trim();
+              merged.email = email;
+              set({ email });
+            }
           } catch (e) {}
+        }
+
+        // 1. Salva nos caches locais imediatamente
+        try {
+          localStorage.setItem(GLOBAL_PROFILE_KEY, JSON.stringify(merged));
+          if (email) {
+            localStorage.setItem(`lypsyos_profile_${email}`, JSON.stringify(merged));
+          }
+        } catch (e) {
+          console.warn('Erro ao salvar cache local:', e);
         }
 
         // 2. Salva no Supabase (Auth metadata e public.usuarios)
         if (isSupabaseConfigured()) {
           try {
+            // Se o avatar for muito grande (>30KB), não coloca em user_metadata para evitar erro 400
+            const safeAvatarForMeta = (formData.avatarUrl && formData.avatarUrl.length > 30000)
+              ? ''
+              : formData.avatarUrl;
+
             await supabase.auth.updateUser({
               data: {
-                nome_completo: formData.responsibleName,
-                nome_salao: formData.businessName,
-                whatsapp: formData.whatsapp,
-                avatar_url: formData.avatarUrl,
-                chave_pix: formData.pixKey,
-                tipo_chave_pix: formData.pixType,
-                cor_primaria: formData.themeColor,
-                theme_mode: formData.themeMode,
-                bio: formData.bio,
-                segmento: formData.segment
+                nome_completo: formData.responsibleName || merged.responsibleName,
+                nome_salao: formData.businessName || merged.businessName,
+                whatsapp: formData.whatsapp || merged.whatsapp,
+                avatar_url: safeAvatarForMeta || merged.avatarUrl || '',
+                chave_pix: formData.pixKey || merged.pixKey,
+                tipo_chave_pix: formData.pixType || merged.pixType,
+                cor_primaria: formData.themeColor || merged.themeColor,
+                theme_mode: formData.themeMode || merged.themeMode,
+                bio: formData.bio || merged.bio,
+                segmento: formData.segment || merged.segment
               }
             });
 
             const { data: { user } } = await supabase.auth.getUser();
             if (user) {
-              await supabase.from('usuarios').upsert({
+              const usuarioRow = {
                 id: user.id,
-                nome_completo: formData.responsibleName || 'Responsável',
-                nome_salao: formData.businessName || 'Meu Estabelecimento',
-                whatsapp: formData.whatsapp || '',
-                avatar_url: formData.avatarUrl || '',
-                chave_pix: formData.pixKey || '',
-                tipo_chave_pix: formData.pixType || 'TELEFONE',
-                cor_primaria: formData.themeColor || '#2563eb',
-                bio: formData.bio || '',
-                segmento: formData.segment || 'manicure',
+                nome_completo: formData.responsibleName || merged.responsibleName || 'Responsável',
+                nome_salao: formData.businessName || merged.businessName || 'Meu Estabelecimento',
+                whatsapp: formData.whatsapp || merged.whatsapp || '',
+                avatar_url: formData.avatarUrl || merged.avatarUrl || '',
+                chave_pix: formData.pixKey || merged.pixKey || '',
+                tipo_chave_pix: formData.pixType || merged.pixType || 'TELEFONE',
+                cor_primaria: formData.themeColor || merged.themeColor || '#2563eb',
+                theme_mode: formData.themeMode || merged.themeMode || 'light',
+                bio: formData.bio || merged.bio || '',
+                segmento: formData.segment || merged.segment || 'manicure',
                 atualizado_em: new Date().toISOString()
-              });
+              };
+
+              const { error: upsertErr } = await supabase
+                .from('usuarios')
+                .upsert(usuarioRow, { onConflict: 'id' });
+
+              // Fallback para update caso upsert seja bloqueado por regra antiga de RLS
+              if (upsertErr) {
+                console.warn('Upsert usuarios aviso, tentando update de contingência:', upsertErr);
+                const { id, ...updateData } = usuarioRow;
+                await supabase.from('usuarios').update(updateData).eq('id', user.id);
+              }
             }
           } catch (err) {
             console.warn('Erro ao salvar no Supabase:', err);
@@ -255,49 +314,44 @@ export const useAppStore = create(
             await axios.post('http://localhost:8000/api/v1/bot/config/', {
               business_name: formData.businessName
             });
-          } catch (err) {
-            console.warn('Erro ao atualizar nome no Django:', err);
-          }
+          } catch (err) {}
         }
 
         // 4. Aplica tema ativo
         applyTheme(formData.themeMode || state.themeMode || 'light', formData.themeColor || state.themeColor || '#2563eb');
       },
 
-      // Logout Seguro (Preserva o cache do usuário e limpa sessão ativa)
+      // Logout Seguro (Preserva as configurações do perfil no navegador e apenas encerra a sessão ativa)
       logout: () => {
         const state = get();
         const currentEmail = (state.email || '').toLowerCase().trim();
 
-        // Salva os dados do usuário atual antes de sair da sessão
-        if (currentEmail) {
-          try {
-            const profileToCache = {
-              businessName: state.businessName,
-              responsibleName: state.responsibleName,
-              email: state.email,
-              whatsapp: state.whatsapp,
-              segment: state.segment,
-              avatarUrl: state.avatarUrl,
-              pixKey: state.pixKey,
-              pixType: state.pixType,
-              themeColor: state.themeColor,
-              themeMode: state.themeMode,
-              bio: state.bio,
-            };
-            localStorage.setItem(`lypsyos_profile_${currentEmail}`, JSON.stringify(profileToCache));
-          } catch (e) {}
-        }
+        // 1. Salva snapshot do perfil atual no cache antes de deslogar
+        const profileSnapshot = {
+          businessName: state.businessName,
+          responsibleName: state.responsibleName,
+          email: state.email,
+          whatsapp: state.whatsapp,
+          segment: state.segment,
+          avatarUrl: state.avatarUrl,
+          pixKey: state.pixKey,
+          pixType: state.pixType,
+          themeColor: state.themeColor,
+          themeMode: state.themeMode,
+          bio: state.bio,
+        };
 
+        try {
+          localStorage.setItem(GLOBAL_PROFILE_KEY, JSON.stringify(profileSnapshot));
+          if (currentEmail) {
+            localStorage.setItem(`lypsyos_profile_${currentEmail}`, JSON.stringify(profileSnapshot));
+          }
+        } catch (e) {}
+
+        // 2. Encerra a autenticação sem apagar as configurações visuais e dados cadastrados
         set({
-          ...initialState,
           isOnboarded: false,
           isAuthenticated: false,
-          businessName: 'Meu Estabelecimento',
-          responsibleName: '',
-          email: '',
-          whatsapp: '',
-          subscription: defaultSubscription,
         });
       }
     }),

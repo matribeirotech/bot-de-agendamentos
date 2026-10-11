@@ -24,6 +24,43 @@ const THEME_PRESETS = [
   { name: 'Grafite Elegance', hex: '#334155', bg: 'bg-slate-700' },
 ];
 
+// Utilitário para compactar e redimensionar imagens antes de salvar (mantém avatar leve < 15KB)
+const compressImage = (file, maxWidth = 256, maxHeight = 256, quality = 0.8) => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          }
+        } else {
+          if (height > maxHeight) {
+            width = Math.round((width * maxHeight) / height);
+            height = maxHeight;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = reject;
+      img.src = e.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+};
+
 export default function Profile() {
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
@@ -88,6 +125,18 @@ export default function Profile() {
         }));
       }
     });
+
+    // Se o email local estiver vazio, busca da sessão autenticada do Supabase
+    if (isSupabaseConfigured()) {
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (session?.user?.email) {
+          setFormData(prev => ({
+            ...prev,
+            email: prev.email || session.user.email
+          }));
+        }
+      });
+    }
   }, [loadUserProfile]);
 
   // Atualiza o estado se o store for alterado externamente
@@ -108,8 +157,8 @@ export default function Profile() {
     }));
   }, [responsibleName, email, whatsapp, businessName, segment, avatarUrl, pixKey, pixType, themeColor, themeMode, bio]);
 
-  // Upload Real da Foto de Perfil
-  const handleAvatarFileUpload = (e) => {
+  // Upload Otimizado da Foto de Perfil com Redimensionamento Automático
+  const handleAvatarFileUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -118,24 +167,25 @@ export default function Profile() {
       return;
     }
 
-    if (file.size > 5 * 1024 * 1024) {
-      setStatusMessage({ type: 'error', text: 'A imagem deve ter no máximo 5MB.' });
+    if (file.size > 10 * 1024 * 1024) {
+      setStatusMessage({ type: 'error', text: 'A imagem deve ter no máximo 10MB.' });
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      const base64Url = event.target?.result;
-      if (typeof base64Url === 'string') {
-        const nextData = { ...formData, avatarUrl: base64Url };
-        setFormData(nextData);
-        await saveUserProfile(nextData);
+    try {
+      setStatusMessage({ type: 'info', text: 'Otimizando foto de perfil...' });
+      // Redimensiona para max 256x256 mantendo proporção (~10KB em JPEG)
+      const compressedDataUrl = await compressImage(file, 256, 256, 0.82);
+      const nextData = { ...formData, avatarUrl: compressedDataUrl };
+      setFormData(nextData);
+      await saveUserProfile(nextData);
 
-        setStatusMessage({ type: 'success', text: 'Foto de perfil salva com sucesso!' });
-        setTimeout(() => setStatusMessage({ type: '', text: '' }), 4000);
-      }
-    };
-    reader.readAsDataURL(file);
+      setStatusMessage({ type: 'success', text: 'Foto de perfil salva com sucesso!' });
+      setTimeout(() => setStatusMessage({ type: '', text: '' }), 4000);
+    } catch (err) {
+      console.error('Erro ao processar imagem:', err);
+      setStatusMessage({ type: 'error', text: 'Não foi possível processar a imagem. Tente outro arquivo.' });
+    }
   };
 
   // Remover Foto de Perfil
@@ -221,12 +271,23 @@ export default function Profile() {
     }
 
     try {
-      // Salva em todas as camadas (Store, LocalStorage por e-mail, Supabase e Backend Django)
-      await saveUserProfile(formData);
-      setSegment(formData.segment);
+      const dataToSave = {
+        ...formData,
+        email: formData.email || email,
+      };
+      if (!dataToSave.email && isSupabaseConfigured()) {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user?.email) {
+          dataToSave.email = session.user.email;
+        }
+      }
+
+      // Salva em todas as camadas (Store, LocalStorage global e por e-mail, Supabase e Backend Django)
+      await saveUserProfile(dataToSave);
+      setSegment(dataToSave.segment);
 
       // Sincroniza serviços do segmento no Backend
-      await syncSegmentServices(formData.segment);
+      await syncSegmentServices(dataToSave.segment);
 
       setStatusMessage({ 
         type: 'success', 
