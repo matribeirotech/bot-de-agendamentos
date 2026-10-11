@@ -32,3 +32,29 @@ class Appointment(models.Model):
 
     def __str__(self):
         return f"{self.client.full_name} - {self.service.name} em {self.start_time}"
+
+
+class BusinessHour(models.Model):
+    DAY_CHOICES = [
+        (0, 'Segunda-feira'),
+        (1, 'Terça-feira'),
+        (2, 'Quarta-feira'),
+        (3, 'Quinta-feira'),
+        (4, 'Sexta-feira'),
+        (5, 'Sábado'),
+        (6, 'Domingo'),
+    ]
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name='business_hours')
+    day_of_week = models.IntegerField(choices=DAY_CHOICES)
+    is_open = models.BooleanField(default=True)
+    open_time = models.TimeField(null=True, blank=True)
+    close_time = models.TimeField(null=True, blank=True)
+    break_start = models.TimeField(null=True, blank=True)
+    break_end = models.TimeField(null=True, blank=True)
+
+    class Meta:
+        unique_together = ('tenant', 'day_of_week')
+
+    def __str__(self):
+        return f"{self.get_day_of_week_display()} - {'Aberto' if self.is_open else 'Fechado'}"

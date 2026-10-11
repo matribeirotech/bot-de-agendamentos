@@ -1,0 +1,66 @@
+services:
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: lypsyos
+      POSTGRES_USER: lypsyos_user
+      POSTGRES_PASSWORD: lypsyos_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lypsyos_user -d lypsyos"]
+      interval: 3s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    command: >
+      sh -c "while ! python -c 'import socket; s = socket.socket(); s.connect((\"db\", 5432))' 2>/dev/null; do
+               echo 'Aguardando PostgreSQL...' ;
+               sleep 1 ;
+             done &&
+             python manage.py migrate &&
+             python manage.py runserver 0.0.0.0:8000"
+    volumes:
+      - ./backend:/app
+    ports:
+      - "8000:8000"
+    environment:
+      - DEBUG=True
+      - DATABASE_URL=postgres://lypsyos_user:lypsyos_password@db:5432/lypsyos
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - db
+      - redis
+    restart: unless-stopped
+
+  whatsapp-worker:
+    build:
+      context: ./whatsapp-worker
+      dockerfile: Dockerfile
+    volumes:
+      - ./whatsapp-worker/auth_info_baileys:/app/auth_info_baileys
+    ports:
+      - "3001:3001"
+    environment:
+      - DJANGO_WEBHOOK_URL=http://backend:8000/api/v1/bot/webhook/incoming/
+      - TENANT_ID=5ea98896-b3ba-4d10-951d-edd908422147
+    depends_on:
+      - backend
+    restart: always # Mecanismo de autorestart crítico para o Baileys
+
+volumes:
+  postgres_data:
+
