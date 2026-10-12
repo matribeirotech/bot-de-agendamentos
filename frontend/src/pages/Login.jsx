@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { useNavigate, Link } from 'react-router-dom';
+import { useAppStore } from '../store/useAppStore';
 import { 
   Sparkles, CheckCircle2, Lock, Mail, User, Phone, 
   Building2, ArrowRight, ShieldCheck, AlertCircle, KeyRound
@@ -72,6 +73,15 @@ export default function Login() {
 
         if (error) throw error;
 
+        if (data?.user) {
+          await useAppStore.getState().saveUserProfile({
+            email,
+            responsibleName: fullName,
+            businessName: salonName,
+            whatsapp: whatsapp
+          });
+        }
+
         setSuccessMsg("Conta criada com sucesso! Você ganhou 30 dias de acesso Pro grátis. Redirecionando...");
         setTimeout(() => navigate('/'), 2000);
       } else {
@@ -82,6 +92,10 @@ export default function Login() {
         });
 
         if (error) throw error;
+
+        // Sincroniza imediatamente o perfil do usuário logado
+        const loggedEmail = data?.user?.email || email;
+        await useAppStore.getState().loadUserProfile(loggedEmail);
 
         navigate('/');
       }

@@ -14,7 +14,7 @@ export default function Services() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [statusMessage, setStatusMessage] = useState({ type: '', text: '' });
 
-  const { segment, businessName } = useAppStore();
+  const { segment, businessName, themeColor } = useAppStore();
   const segmentObj = SEGMENTS.find(s => s.id === segment) || SEGMENTS[0];
 
   useEffect(() => {
@@ -123,16 +123,16 @@ export default function Services() {
   return (
     <div className="space-y-8">
       {/* Header Estilo Landing Page */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-2 border-b border-slate-200/60">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-2 border-b border-slate-200/60 dark:border-slate-800">
         <div>
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 border border-blue-100 text-blue-700 text-xs font-semibold tracking-wide uppercase mb-3">
-            <span className="w-2 h-2 rounded-full bg-blue-600"></span>
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-950/50 border border-blue-100 dark:border-blue-900/60 text-blue-700 dark:text-blue-300 text-xs font-semibold tracking-wide uppercase mb-3">
+            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: themeColor || '#2563eb' }}></span>
             Catálogo de Serviços • {businessName}
           </div>
-          <h1 className="text-3xl md:text-4xl font-extrabold text-slate-900 tracking-tight leading-tight">
+          <h1 className="text-3xl md:text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight leading-tight">
             Seus Procedimentos & <span className="text-emerald-500">Valores</span>
           </h1>
-          <p className="text-slate-600 mt-2 text-sm md:text-base max-w-2xl">
+          <p className="text-slate-600 dark:text-slate-400 mt-2 text-sm md:text-base max-w-2xl">
             Configure o cardápio de serviços que o robô do WhatsApp oferece automaticamente para os seus clientes.
           </p>
         </div>
@@ -142,16 +142,17 @@ export default function Services() {
           <button
             onClick={handleSyncSegment}
             disabled={isSyncing}
-            className="inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs px-4 py-3 rounded-xl border border-slate-200 shadow-xs transition-all cursor-pointer disabled:opacity-50"
+            className="inline-flex items-center gap-2 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 font-semibold text-xs px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs transition-all cursor-pointer disabled:opacity-50"
             title="Atualiza os serviços padrão para o segmento configurado no seu perfil"
           >
-            <RefreshCw className={`w-4 h-4 text-blue-600 ${isSyncing ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-4 h-4 text-blue-600 dark:text-blue-400 ${isSyncing ? 'animate-spin' : ''}`} />
             <span>{isSyncing ? "Sincronizando..." : `Sincronizar ${segmentObj.title.split('&')[0]}`}</span>
           </button>
 
           <button 
             onClick={() => setIsModalOpen(true)}
-            className="inline-flex items-center justify-center gap-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm px-6 py-3 rounded-xl shadow-lg shadow-blue-500/25 active:scale-[0.98] transition-all whitespace-nowrap cursor-pointer"
+            style={{ backgroundColor: themeColor || '#2563eb' }}
+            className="inline-flex items-center justify-center gap-2.5 text-white font-semibold text-sm px-6 py-3 rounded-xl shadow-lg shadow-blue-500/25 active:scale-[0.98] transition-all whitespace-nowrap cursor-pointer hover:opacity-90"
           >
             <Plus className="w-5 h-5" />
             Novo Procedimento
@@ -160,22 +161,22 @@ export default function Services() {
       </div>
 
       {/* Banner Informativo do Segmento Ativo */}
-      <div className="bg-gradient-to-r from-blue-50/80 to-slate-50 border border-blue-100/80 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+      <div className="bg-gradient-to-r from-blue-50/80 to-slate-50 dark:from-slate-900 dark:to-slate-800/80 border border-blue-100/80 dark:border-slate-700 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
         <div className="flex items-center gap-3">
-          <span className="text-2xl p-2 bg-white rounded-xl shadow-2xs border border-blue-100">
+          <span className="text-2xl p-2 bg-white dark:bg-slate-800 rounded-xl shadow-2xs border border-blue-100 dark:border-slate-700">
             {segmentObj.icon}
           </span>
           <div>
-            <p className="font-bold text-slate-900">
-              Nicho Ativo: <span className="text-blue-700">{segmentObj.title}</span>
+            <p className="font-bold text-slate-900 dark:text-white">
+              Nicho Ativo: <span className="text-blue-700 dark:text-blue-400">{segmentObj.title}</span>
             </p>
-            <p className="text-slate-500 mt-0.5">
+            <p className="text-slate-500 dark:text-slate-400 mt-0.5">
               O robô do WhatsApp utiliza estes serviços cadastrados para preencher sua agenda automaticamente.
             </p>
           </div>
         </div>
 
-        <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1 rounded-full font-bold self-start sm:self-auto">
+        <span className="bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 px-3 py-1 rounded-full font-bold self-start sm:self-auto">
           {activeServices.length} serviços ativos
         </span>
       </div>
@@ -184,40 +185,41 @@ export default function Services() {
       {statusMessage.text && (
         <div className={`p-4 rounded-2xl flex items-center gap-3 text-sm animate-in fade-in ${
           statusMessage.type === 'success' 
-            ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' 
-            : 'bg-rose-50 text-rose-800 border border-rose-200'
+            ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800' 
+            : 'bg-rose-50 dark:bg-rose-950/60 text-rose-800 dark:text-rose-300 border border-rose-200 dark:border-rose-800'
         }`}>
-          <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+          <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
           <span className="font-medium">{statusMessage.text}</span>
         </div>
       )}
 
       {/* Grid de Serviços */}
       {loading ? (
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-16 text-center flex flex-col items-center justify-center">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-16 text-center flex flex-col items-center justify-center">
           <div className="w-10 h-10 border-4 border-blue-600/30 border-t-blue-600 rounded-full animate-spin mb-4"></div>
-          <p className="text-slate-600 font-medium text-sm">Carregando serviços cadastrados...</p>
+          <p className="text-slate-600 dark:text-slate-400 font-medium text-sm">Carregando serviços cadastrados...</p>
         </div>
       ) : services.length === 0 ? (
-        <div className="bg-white rounded-3xl border border-slate-200/80 p-16 text-center flex flex-col items-center justify-center shadow-sm">
-          <div className="w-16 h-16 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mb-4">
+        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 p-16 text-center flex flex-col items-center justify-center shadow-sm">
+          <div className="w-16 h-16 rounded-2xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center mb-4">
             <Tag className="w-8 h-8" />
           </div>
-          <h3 className="text-xl font-bold text-slate-900">Nenhum serviço cadastrado</h3>
-          <p className="text-slate-500 mt-1 max-w-sm text-sm">
+          <h3 className="text-xl font-bold text-slate-900 dark:text-white">Nenhum serviço cadastrado</h3>
+          <p className="text-slate-500 dark:text-slate-400 mt-1 max-w-sm text-sm">
             Clique no botão abaixo para carregar os serviços padrão de {segmentObj.title} ou crie um manualmente.
           </p>
           <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
             <button 
               onClick={handleSyncSegment}
-              className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm px-5 py-2.5 rounded-xl transition-all shadow-md shadow-blue-500/20 cursor-pointer"
+              style={{ backgroundColor: themeColor || '#2563eb' }}
+              className="inline-flex items-center gap-2 text-white font-semibold text-sm px-5 py-2.5 rounded-xl transition-all shadow-md shadow-blue-500/20 cursor-pointer hover:opacity-90"
             >
               <RefreshCw className="w-4 h-4" />
               Carregar Serviços de {segmentObj.title.split('&')[0]}
             </button>
             <button 
               onClick={() => setIsModalOpen(true)}
-              className="inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-sm px-5 py-2.5 rounded-xl border border-slate-200 shadow-xs cursor-pointer"
+              className="inline-flex items-center gap-2 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-sm px-5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-xs cursor-pointer"
             >
               <Plus className="w-4 h-4" />
               Criar Manual
@@ -230,45 +232,47 @@ export default function Services() {
           {[...activeServices, ...inactiveServices].map(svc => (
             <div 
               key={svc.id} 
-              className={`bg-white rounded-2xl border transition-all duration-300 p-6 flex flex-col justify-between shadow-sm hover:shadow-md ${
-                svc.is_active ? 'border-slate-200/80' : 'border-slate-200/60 opacity-60 bg-slate-50/50'
+              className={`bg-white dark:bg-slate-900 rounded-2xl border transition-all duration-300 p-6 flex flex-col justify-between shadow-sm hover:shadow-md ${
+                svc.is_active 
+                  ? 'border-slate-200/80 dark:border-slate-800' 
+                  : 'border-slate-200/60 dark:border-slate-800/60 opacity-60 bg-slate-50/50 dark:bg-slate-900/50'
               }`}
             >
               <div>
                 <div className="flex items-start justify-between gap-3 mb-3">
-                  <h3 className="text-lg font-bold text-slate-900">{svc.name}</h3>
+                  <h3 className="text-lg font-bold text-slate-900 dark:text-white">{svc.name}</h3>
                   <button 
                     onClick={() => toggleServiceStatus(svc)}
                     className={`text-xs font-semibold px-2.5 py-1 rounded-full border transition-all cursor-pointer ${
                       svc.is_active 
-                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' 
-                        : 'bg-slate-100 text-slate-500 border-slate-200 hover:bg-slate-200'
+                        ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100' 
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:bg-slate-200'
                     }`}
                   >
                     {svc.is_active ? '● Ativo no Bot' : '○ Pausado'}
                   </button>
                 </div>
 
-                <div className="text-2xl font-extrabold text-emerald-600 tracking-tight mb-4">
+                <div className="text-2xl font-extrabold text-emerald-600 dark:text-emerald-400 tracking-tight mb-4">
                   R$ {parseFloat(svc.price).toFixed(2).replace('.', ',')}
                 </div>
 
-                <div className="flex items-center gap-4 text-xs font-medium text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-100 mb-4">
+                <div className="flex items-center gap-4 text-xs font-medium text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-800/60 p-3 rounded-xl border border-slate-100 dark:border-slate-700/60 mb-4">
                   <div className="flex items-center gap-1.5">
-                    <Clock className="w-4 h-4 text-blue-600" />
-                    <span>Duração: <strong>{svc.duration_minutes} min</strong></span>
+                    <Clock className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                    <span>Duração: <strong className="text-slate-900 dark:text-white">{svc.duration_minutes} min</strong></span>
                   </div>
-                  <div className="flex items-center gap-1.5 text-slate-400">
+                  <div className="flex items-center gap-1.5 text-slate-400 dark:text-slate-500">
                     <span>|</span>
                     <span>Agendamento automático</span>
                   </div>
                 </div>
               </div>
 
-              <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+              <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
                 <button 
                   onClick={() => toggleServiceStatus(svc)}
-                  className="text-blue-600 hover:text-blue-700 font-semibold cursor-pointer"
+                  className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-semibold cursor-pointer"
                 >
                   {svc.is_active ? 'Desativar no Bot' : 'Reativar no Bot'}
                 </button>
@@ -276,7 +280,7 @@ export default function Services() {
                 <button
                   onClick={() => handleDeleteService(svc.id)}
                   title="Excluir procedimento"
-                  className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-colors cursor-pointer"
+                  className="p-1.5 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>
@@ -289,15 +293,15 @@ export default function Services() {
       {/* Modal Novo Serviço */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200 border border-slate-100">
-            <div className="flex justify-between items-center p-6 border-b border-slate-100 bg-gradient-to-r from-blue-50/50 to-white">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200 border border-slate-100 dark:border-slate-800">
+            <div className="flex justify-between items-center p-6 border-b border-slate-100 dark:border-slate-800 bg-gradient-to-r from-blue-50/50 to-white dark:from-slate-800 dark:to-slate-900">
               <div>
-                <h3 className="font-bold text-lg text-slate-900">Novo Procedimento</h3>
-                <p className="text-xs text-slate-500 mt-0.5">Defina o nome, duração e valor cobrado</p>
+                <h3 className="font-bold text-lg text-slate-900 dark:text-white">Novo Procedimento</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Defina o nome, duração e valor cobrado</p>
               </div>
               <button 
                 onClick={() => setIsModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 p-2 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer"
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -305,7 +309,7 @@ export default function Services() {
             
             <form onSubmit={handleCreateService} className="p-6 space-y-4">
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
                   Nome do Procedimento
                 </label>
                 <input 
@@ -313,13 +317,13 @@ export default function Services() {
                   name="name" 
                   required 
                   placeholder={segment === 'barbearia' ? 'Ex: Corte Degradê Navalhado' : 'Ex: Manicure e Esmaltação'}
-                  className="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-medium" 
+                  className="w-full px-3.5 py-2.5 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-medium" 
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
                     Preço (R$)
                   </label>
                   <input 
@@ -328,11 +332,11 @@ export default function Services() {
                     name="price" 
                     required 
                     placeholder="45.00" 
-                    className="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-medium" 
+                    className="w-full px-3.5 py-2.5 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-medium" 
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
                     Duração (min)
                   </label>
                   <input 
@@ -341,7 +345,7 @@ export default function Services() {
                     name="duration_minutes" 
                     required 
                     defaultValue="45" 
-                    className="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-medium" 
+                    className="w-full px-3.5 py-2.5 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-medium" 
                   />
                 </div>
               </div>
@@ -350,13 +354,14 @@ export default function Services() {
                 <button 
                   type="button" 
                   onClick={() => setIsModalOpen(false)}
-                  className="flex-1 py-3 border border-slate-200 rounded-xl text-slate-600 font-semibold text-xs hover:bg-slate-50 transition-colors cursor-pointer"
+                  className="flex-1 py-3 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 font-semibold text-xs transition-colors cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button 
                   type="submit" 
-                  className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-xl shadow-lg shadow-blue-500/25 active:scale-[0.98] transition-all cursor-pointer"
+                  style={{ backgroundColor: themeColor || '#2563eb' }}
+                  className="flex-1 py-3 text-white font-semibold text-xs rounded-xl shadow-lg shadow-blue-500/25 active:scale-[0.98] transition-all cursor-pointer hover:opacity-90"
                 >
                   Salvar Procedimento
                 </button>
