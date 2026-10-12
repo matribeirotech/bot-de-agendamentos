@@ -1,11 +1,56 @@
 import { useState, useEffect } from 'react';
-import { Eye, EyeOff, QrCode, CheckCircle2, Calendar, MessageCircle, ExternalLink, ShieldCheck } from 'lucide-react';
+import { 
+  Eye, EyeOff, QrCode, CheckCircle2, Calendar, MessageCircle, 
+  ExternalLink, ShieldCheck, Bell, Clock, Smartphone, Download, Sparkles, Check
+} from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
+import { 
+  getNotificationSettings, 
+  saveNotificationSettings, 
+  requestPushPermission, 
+  sendTestNotification, 
+  getNotificationPermission, 
+  isPushSupported 
+} from '../lib/pushNotifications';
 
 export default function Settings() {
-  const { themeColor } = useAppStore();
+  const { themeColor, responsibleName } = useAppStore();
   const [workerStatus, setWorkerStatus] = useState({ connected: false, qr: '' });
   const [showQR, setShowQR] = useState(false);
+
+  // Estados de Notificações Push & PWA
+  const [pushSettings, setPushSettings] = useState(getNotificationSettings());
+  const [permissionStatus, setPermissionStatus] = useState(getNotificationPermission());
+  const [testStatus, setTestStatus] = useState({ type: '', text: '' });
+  const [isTestingPush, setIsTestingPush] = useState(false);
+  const [installPrompt, setInstallPrompt] = useState(null);
+  const [isInstalled, setIsInstalled] = useState(false);
+  const [showInstallHelp, setShowInstallHelp] = useState(false);
+
+  // Monitora evento de instalação PWA (beforeinstallprompt)
+  useEffect(() => {
+    const handleBeforeInstall = (e) => {
+      e.preventDefault();
+      setInstallPrompt(e);
+    };
+
+    const handleAppInstalled = () => {
+      setIsInstalled(true);
+      setInstallPrompt(null);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstall);
+    window.addEventListener('appinstalled', handleAppInstalled);
+
+    if (window.matchMedia('(display-mode: standalone)').matches) {
+      setIsInstalled(true);
+    }
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
+      window.removeEventListener('appinstalled', handleAppInstalled);
+    };
+  }, []);
 
   useEffect(() => {
     const checkWorkerStatus = async () => {
@@ -24,6 +69,85 @@ export default function Settings() {
     const interval = setInterval(checkWorkerStatus, 2000);
     return () => clearInterval(interval);
   }, []);
+
+  // Alternar Notificações Push
+  const handleTogglePush = async () => {
+    const nextEnabled = !pushSettings.enabled;
+    if (nextEnabled) {
+      try {
+        const perm = await requestPushPermission();
+        setPermissionStatus(perm);
+        if (perm === 'granted') {
+          const updated = saveNotificationSettings({ enabled: true });
+          setPushSettings(updated);
+          setTestStatus({ type: 'success', text: 'Notificações push ativadas com sucesso neste aparelho!' });
+        } else {
+          setTestStatus({ type: 'error', text: 'Permissão para notificações não foi autorizada no aparelho.' });
+        }
+      } catch (err) {
+        setTestStatus({ type: 'error', text: err.message || 'Falha ao solicitar permissões de notificação.' });
+      }
+    } else {
+      const updated = saveNotificationSettings({ enabled: false });
+      setPushSettings(updated);
+      setTestStatus({ type: 'info', text: 'Alertas push diários desativados.' });
+    }
+    setTimeout(() => setTestStatus({ type: '', text: '' }), 4000);
+  };
+
+  // Alterar Horário Matinal
+  const handleMorningTimeChange = (e) => {
+    const newTime = e.target.value;
+    const updated = saveNotificationSettings({ morningTime: newTime });
+    setPushSettings(updated);
+  };
+
+  // Alternar Notificação de Novos Agendamentos
+  const handleToggleNewAppointmentPush = () => {
+    const updated = saveNotificationSettings({ notifyOnNewAppointment: !pushSettings.notifyOnNewAppointment });
+    setPushSettings(updated);
+  };
+
+  // Alternar Resumo Diário
+  const handleToggleDailySummary = () => {
+    const updated = saveNotificationSettings({ dailySummary: !pushSettings.dailySummary });
+    setPushSettings(updated);
+  };
+
+  // Alternar Google Calendar Sync
+  const handleToggleGoogleCalendarSync = () => {
+    const updated = saveNotificationSettings({ googleCalendarSync: !pushSettings.googleCalendarSync });
+    setPushSettings(updated);
+  };
+
+  // Disparar Teste de Notificação
+  const handleTestPush = async () => {
+    setIsTestingPush(true);
+    setTestStatus({ type: '', text: '' });
+    try {
+      await sendTestNotification(responsibleName || 'Profissional');
+      setTestStatus({ type: 'success', text: '🔔 Notificação enviada! Verifique a barra de avisos do seu aparelho.' });
+    } catch (err) {
+      setTestStatus({ type: 'error', text: err.message || 'Erro ao disparar teste de notificação.' });
+    } finally {
+      setIsTestingPush(false);
+      setTimeout(() => setTestStatus({ type: '', text: '' }), 5000);
+    }
+  };
+
+  // Instalar PWA no Aparelho
+  const handleInstallPWA = async () => {
+    if (installPrompt) {
+      installPrompt.prompt();
+      const { outcome } = await installPrompt.userChoice;
+      if (outcome === 'accepted') {
+        setIsInstalled(true);
+      }
+      setInstallPrompt(null);
+    } else {
+      setShowInstallHelp(!showInstallHelp);
+    }
+  };
 
   return (
     <div className="space-y-8 max-w-5xl mx-auto">
@@ -136,6 +260,190 @@ export default function Settings() {
           )}
         </div>
 
+        {/* ========================================================================= */}
+        {/* NOVO: APLICATIVO MOBILE (PWA INSTALÁVEL NO CELULAR)                      */}
+        {/* ========================================================================= */}
+        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 p-6 md:p-8 shadow-sm">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div 
+                className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 border"
+                style={{ 
+                  backgroundColor: `${themeColor || '#2563eb'}15`,
+                  borderColor: `${themeColor || '#2563eb'}30`,
+                  color: themeColor || '#2563eb' 
+                }}
+              >
+                <Smartphone className="w-6 h-6" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-bold text-lg text-slate-900 dark:text-white">Aplicativo Móvel Instalável (PWA)</h3>
+                  {isInstalled ? (
+                    <span className="inline-flex items-center gap-1 text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                      <Check className="w-3 h-3" /> Instalado no Aparelho
+                    </span>
+                  ) : (
+                    <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                      Pronto para Instalação
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  Acesse o Lypsyos como um app nativo no celular: sem barra de navegador, tela cheia e ícone na tela inicial.
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={handleInstallPWA}
+              style={{ backgroundColor: themeColor || '#2563eb' }}
+              className="inline-flex items-center gap-2 text-white font-semibold text-xs px-5 py-2.5 rounded-xl shadow-sm transition-all self-start sm:self-auto cursor-pointer hover:opacity-90 active:scale-95"
+            >
+              <Download className="w-4 h-4" />
+              <span>{isInstalled ? "Aplicativo Instalado" : "Instalar no Celular"}</span>
+            </button>
+          </div>
+
+          {/* Guia de instalação manual para iOS e navegadores sem suporte direto */}
+          {showInstallHelp && (
+            <div className="mt-5 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700 text-xs space-y-3 animate-in fade-in">
+              <h4 className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                <Sparkles className="w-4 h-4 text-amber-500" />
+                Como instalar no seu celular:
+              </h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-slate-600 dark:text-slate-300">
+                <div className="p-3 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
+                  <p className="font-bold text-slate-800 dark:text-white mb-1">📱 No iPhone (Safari):</p>
+                  <ol className="list-decimal list-inside space-y-1 text-[11px]">
+                    <li>Toque no botão <strong>Compartilhar</strong> (ícone com quadrado e seta para cima).</li>
+                    <li>Role para baixo e selecione <strong>Adicionar à Tela de Início</strong>.</li>
+                    <li>Toque em <strong>Adicionar</strong> no canto superior direito.</li>
+                  </ol>
+                </div>
+                <div className="p-3 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
+                  <p className="font-bold text-slate-800 dark:text-white mb-1">🤖 No Android (Chrome):</p>
+                  <ol className="list-decimal list-inside space-y-1 text-[11px]">
+                    <li>Toque nos <strong>3 pontinhos</strong> no canto superior direito.</li>
+                    <li>Selecione <strong>Instalar aplicativo</strong> ou <strong>Adicionar à tela inicial</strong>.</li>
+                    <li>Confirme a instalação.</li>
+                  </ol>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* ========================================================================= */}
+        {/* NOVO: NOTIFICAÇÕES PROATIVAS PUSH & RESUMO MATINAL                       */}
+        {/* ========================================================================= */}
+        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 p-6 md:p-8 shadow-sm space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100 dark:border-slate-800">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border border-amber-100 dark:border-amber-800/40 flex items-center justify-center shrink-0">
+                <Bell className="w-6 h-6" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-bold text-lg text-slate-900 dark:text-white">Notificações Push Proativas</h3>
+                  <span className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full border ${
+                    pushSettings.enabled 
+                      ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700'
+                  }`}>
+                    {pushSettings.enabled ? 'Ativo no Aparelho' : 'Desativado'}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  Receba avisos na tela de bloqueio com o resumo da agenda do dia e alertas de novos clientes no WhatsApp.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={handleTestPush}
+                disabled={isTestingPush}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 transition-all cursor-pointer disabled:opacity-50"
+              >
+                <Bell className="w-3.5 h-3.5 text-amber-500" />
+                <span>{isTestingPush ? 'Enviando...' : 'Testar Notificação'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleTogglePush}
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                  pushSettings.enabled ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-700'
+                }`}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                    pushSettings.enabled ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
+          </div>
+
+          {/* Feedback de Teste / Permissão */}
+          {testStatus.text && (
+            <div className={`p-3.5 rounded-2xl text-xs font-semibold flex items-center gap-2 animate-in fade-in ${
+              testStatus.type === 'success' 
+                ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800' 
+                : 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800'
+            }`}>
+              <span>{testStatus.text}</span>
+            </div>
+          )}
+
+          {/* Configuração de Horário Matinal & Preferências */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="p-4 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40 space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                  Horário do Resumo Matinal
+                </label>
+                <input
+                  type="time"
+                  value={pushSettings.morningTime || '08:00'}
+                  onChange={handleMorningTimeChange}
+                  className="px-2.5 py-1 text-xs font-bold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500/20"
+                />
+              </div>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                Neste horário, o Lypsyos enviará um push com a quantidade de clientes e a lista de atendimentos do dia.
+              </p>
+            </div>
+
+            <div className="p-4 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40 flex items-center justify-between">
+              <div>
+                <p className="text-xs font-bold text-slate-800 dark:text-white">
+                  Novos Agendamentos no WhatsApp
+                </p>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                  Receba um push imediato sempre que o robô fechar um horário.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleToggleNewAppointmentPush}
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
+                  pushSettings.notifyOnNewAppointment ? 'bg-blue-600' : 'bg-slate-300 dark:bg-slate-700'
+                }`}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                    pushSettings.notifyOnNewAppointment ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
+          </div>
+        </div>
+
         {/* Google Calendar (Fase 6) */}
         <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 p-6 md:p-8 shadow-sm">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -151,18 +459,34 @@ export default function Settings() {
                   </span>
                 </div>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                  Eventos marcados no seu celular bloqueiam horários no robô automaticamente.
+                  Eventos marcados no seu celular disparam os lembretes nativos do Google Agenda (notificação com som 15 min antes).
                 </p>
               </div>
             </div>
 
-            <button 
-              onClick={() => alert("Redirecionando para autenticação segura do Google OAuth 2.0...")}
-              className="inline-flex items-center gap-2 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-semibold text-xs px-5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-xs transition-all self-start sm:self-auto cursor-pointer"
-            >
-              <ExternalLink className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-              Conectar meu Google
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={handleToggleGoogleCalendarSync}
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
+                  pushSettings.googleCalendarSync ? 'bg-blue-600' : 'bg-slate-300 dark:bg-slate-700'
+                }`}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                    pushSettings.googleCalendarSync ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+
+              <button 
+                onClick={() => alert("Redirecionando para autenticação segura do Google OAuth 2.0...")}
+                className="inline-flex items-center gap-2 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-semibold text-xs px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-xs transition-all cursor-pointer"
+              >
+                <ExternalLink className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                Conectar meu Google
+              </button>
+            </div>
           </div>
         </div>
 

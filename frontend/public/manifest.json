@@ -1,0 +1,52 @@
+{
+  "name": "Lypsyos - Gestão & Agendamentos Inteligentes",
+  "short_name": "Lypsyos",
+  "description": "Sistema de gestão inteligente com automação de agendamentos no WhatsApp, catálogo interativo e CRM para profissionais de beleza.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "window-controls-overlay"],
+  "background_color": "#0f172a",
+  "theme_color": "#2563eb",
+  "orientation": "portrait-primary",
+  "lang": "pt-BR",
+  "categories": ["business", "productivity", "utilities"],
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/favicon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Ver Agenda",
+      "short_name": "Agenda",
+      "description": "Abrir dashboard e lista de agendamentos do dia",
+      "url": "/",
+      "icons": [{ "src": "/favicon.svg", "sizes": "192x192" }]
+    },
+    {
+      "name": "Robô WhatsApp",
+      "short_name": "Robô",
+      "description": "Ver status da conexão e configuração do robô",
+      "url": "/bot",
+      "icons": [{ "src": "/favicon.svg", "sizes": "192x192" }]
+    },
+    {
+      "name": "Meu Perfil",
+      "short_name": "Perfil",
+      "description": "Editar dados do negócio e chave PIX",
+      "url": "/profile",
+      "icons": [{ "src": "/favicon.svg", "sizes": "192x192" }]
+    }
+  ]
+}
+

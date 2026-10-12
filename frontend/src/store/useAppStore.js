@@ -255,52 +255,64 @@ export const useAppStore = create(
         // 2. Salva no Supabase (Auth metadata e public.usuarios)
         if (isSupabaseConfigured()) {
           try {
-            // Se o avatar for muito grande (>30KB), não coloca em user_metadata para evitar erro 400
-            const safeAvatarForMeta = (formData.avatarUrl && formData.avatarUrl.length > 30000)
-              ? ''
-              : formData.avatarUrl;
+            const respName = (formData.responsibleName ?? merged.responsibleName ?? '').trim();
+            const phone = (formData.whatsapp ?? merged.whatsapp ?? '').trim();
+            const salon = (formData.businessName ?? merged.businessName ?? '').trim();
+            const currentMode = formData.themeMode || merged.themeMode || 'light';
+            const currentColor = formData.themeColor || merged.themeColor || '#2563eb';
+
+            // Metadados do Supabase Auth (pequenos e seguros para evitar limite de tamanho)
+            const safeAvatarForMeta = (formData.avatarUrl && !formData.avatarUrl.startsWith('data:'))
+              ? formData.avatarUrl
+              : '';
 
             await supabase.auth.updateUser({
               data: {
-                nome_completo: formData.responsibleName || merged.responsibleName,
-                nome_salao: formData.businessName || merged.businessName,
-                whatsapp: formData.whatsapp || merged.whatsapp,
-                avatar_url: safeAvatarForMeta || merged.avatarUrl || '',
-                chave_pix: formData.pixKey || merged.pixKey,
-                tipo_chave_pix: formData.pixType || merged.pixType,
-                cor_primaria: formData.themeColor || merged.themeColor,
-                theme_mode: formData.themeMode || merged.themeMode,
-                bio: formData.bio || merged.bio,
-                segmento: formData.segment || merged.segment
+                nome_completo: respName,
+                nome_salao: salon,
+                whatsapp: phone,
+                avatar_url: safeAvatarForMeta,
+                chave_pix: formData.pixKey ?? merged.pixKey ?? '',
+                tipo_chave_pix: formData.pixType ?? merged.pixType ?? 'TELEFONE',
+                cor_primaria: currentColor,
+                theme_mode: currentMode,
+                bio: formData.bio ?? merged.bio ?? '',
+                segmento: formData.segment ?? merged.segment ?? 'manicure'
               }
             });
 
             const { data: { user } } = await supabase.auth.getUser();
             if (user) {
+              // Tabela public.usuarios (estritamente as colunas existentes no schema)
               const usuarioRow = {
                 id: user.id,
-                nome_completo: formData.responsibleName || merged.responsibleName || 'Responsável',
-                nome_salao: formData.businessName || merged.businessName || 'Meu Estabelecimento',
-                whatsapp: formData.whatsapp || merged.whatsapp || '',
-                avatar_url: formData.avatarUrl || merged.avatarUrl || '',
-                chave_pix: formData.pixKey || merged.pixKey || '',
-                tipo_chave_pix: formData.pixType || merged.pixType || 'TELEFONE',
-                cor_primaria: formData.themeColor || merged.themeColor || '#2563eb',
-                theme_mode: formData.themeMode || merged.themeMode || 'light',
-                bio: formData.bio || merged.bio || '',
-                segmento: formData.segment || merged.segment || 'manicure',
+                nome_completo: respName || 'Responsável',
+                nome_salao: salon || 'Meu Estabelecimento',
+                whatsapp: phone,
+                avatar_url: formData.avatarUrl ?? merged.avatarUrl ?? '',
+                chave_pix: (formData.pixKey ?? merged.pixKey ?? '').trim(),
+                tipo_chave_pix: formData.pixType ?? merged.pixType ?? 'TELEFONE',
+                cor_primaria: currentColor,
+                bio: (formData.bio ?? merged.bio ?? '').trim(),
+                segmento: formData.segment ?? merged.segment ?? 'manicure',
                 atualizado_em: new Date().toISOString()
               };
 
-              const { error: upsertErr } = await supabase
+              // Tenta UPDATE primeiro
+              const { error: updateErr, data: updatedData } = await supabase
                 .from('usuarios')
-                .upsert(usuarioRow, { onConflict: 'id' });
+                .update(usuarioRow)
+                .eq('id', user.id)
+                .select();
 
-              // Fallback para update caso upsert seja bloqueado por regra antiga de RLS
-              if (upsertErr) {
-                console.warn('Upsert usuarios aviso, tentando update de contingência:', upsertErr);
-                const { id, ...updateData } = usuarioRow;
-                await supabase.from('usuarios').update(updateData).eq('id', user.id);
+              // Se não encontrou registro para atualizar ou ocorreu erro, faz UPSERT
+              if (updateErr || !updatedData || updatedData.length === 0) {
+                const { error: upsertErr } = await supabase
+                  .from('usuarios')
+                  .upsert(usuarioRow, { onConflict: 'id' });
+                if (upsertErr) {
+                  console.warn('Aviso ao sincronizar usuarios no Supabase:', upsertErr);
+                }
               }
             }
           } catch (err) {

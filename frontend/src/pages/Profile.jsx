@@ -139,24 +139,6 @@ export default function Profile() {
     }
   }, [loadUserProfile]);
 
-  // Atualiza o estado se o store for alterado externamente
-  useEffect(() => {
-    setFormData(prev => ({
-      ...prev,
-      responsibleName: responsibleName || prev.responsibleName,
-      email: email || prev.email,
-      whatsapp: whatsapp || prev.whatsapp,
-      businessName: businessName || prev.businessName,
-      segment: segment || prev.segment,
-      avatarUrl: avatarUrl || prev.avatarUrl,
-      pixKey: pixKey || prev.pixKey,
-      pixType: pixType || prev.pixType,
-      themeColor: themeColor || prev.themeColor,
-      themeMode: themeMode || prev.themeMode,
-      bio: bio || prev.bio,
-    }));
-  }, [responsibleName, email, whatsapp, businessName, segment, avatarUrl, pixKey, pixType, themeColor, themeMode, bio]);
-
   // Upload Otimizado da Foto de Perfil com Redimensionamento Automático
   const handleAvatarFileUpload = async (e) => {
     const file = e.target.files?.[0];
@@ -273,7 +255,10 @@ export default function Profile() {
     try {
       const dataToSave = {
         ...formData,
-        email: formData.email || email,
+        responsibleName: (formData.responsibleName || '').trim(),
+        whatsapp: (formData.whatsapp || '').trim(),
+        businessName: (formData.businessName || '').trim(),
+        email: (formData.email || email || '').trim(),
       };
       if (!dataToSave.email && isSupabaseConfigured()) {
         const { data: { session } } = await supabase.auth.getSession();
