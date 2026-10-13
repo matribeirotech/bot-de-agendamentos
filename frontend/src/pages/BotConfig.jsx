@@ -1,16 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { 
   Bot, MessageSquare, Plus, Save, Clock, Sparkles, CheckCircle2, 
   HelpCircle, ChevronRight, ChevronDown, ToggleLeft, ToggleRight, Trash2, 
   Send, Sliders, MapPin, Headphones, LogOut, ShieldCheck, UserCheck, RefreshCw, AlertCircle,
-  Calendar
+  Calendar, Phone, Video, MoreVertical, Smile, RotateCcw, BadgeCheck, CheckCheck, Smartphone, X
 } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { SEGMENTS } from '../lib/segmentSeeds';
 
 export default function BotConfig() {
-  const { businessName, setBusinessName, segment, themeColor } = useAppStore();
+  const { businessName, setBusinessName, segment, themeColor, avatarUrl } = useAppStore();
   const [activeTab, setActiveTab] = useState('messages'); // 'hours' | 'messages' | 'triggers'
   
   // Toggles de Comportamento
@@ -59,9 +59,16 @@ export default function BotConfig() {
     { id: 3, trigger: "pix", response: "Nossa chave PIX é o telefone do salão: (11) 99999-9999. Emitimos comprovante imediato." }
   ]);
 
-  // Estado do Simulador de WhatsApp
-  const [simulatorView, setSimulatorView] = useState('schedule'); // 'schedule' | 'attendant' | 'location' | 'exit'
+  // Estado do Simulador de WhatsApp em Tempo Real com Máquina de Estados
+  const [chatMessages, setChatMessages] = useState([]);
+  const [isBotTyping, setIsBotTyping] = useState(false);
   const [simulatorCustomInput, setSimulatorCustomInput] = useState('');
+  const [simStep, setSimStep] = useState('IDLE'); // 'IDLE' | 'AWAITING_SERVICE' | 'AWAITING_DATE' | 'AWAITING_DATE_LIST' | 'AWAITING_TIME' | 'CONFIRMED'
+  const [simSelectedService, setSimSelectedService] = useState(null);
+  const [simSelectedDate, setSimSelectedDate] = useState(null);
+  const [showFlowsModal, setShowFlowsModal] = useState(false);
+  const [flowsDate, setFlowsDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const chatScrollRef = useRef(null);
 
   // Segmento atual e serviços vinculados
   const currentSegment = SEGMENTS.find(s => s.id === segment) || SEGMENTS[0];
@@ -161,24 +168,292 @@ export default function BotConfig() {
       .replace(/{opcao_sair}/g, triggerExit || '0');
   };
 
-  // Testa input manual no simulador
-  const handleTestSimulatorInput = (e) => {
-    e.preventDefault();
-    const val = simulatorCustomInput.trim();
-    if (!val) return;
+  const getGreetingQuickReplies = () => [
+    { id: triggerSchedule || '1', label: `📅 ${triggerSchedule || '1'} (Agendar)` },
+    { id: triggerAttendant || '2', label: `👤 ${triggerAttendant || '2'} (Atendente)` },
+    { id: triggerLocation || '3', label: `📍 ${triggerLocation || '3'} (Localização)` },
+    { id: triggerExit || '0', label: `🚪 ${triggerExit || '0'} (Sair)` },
+  ];
 
-    if (val === triggerSchedule) {
-      setSimulatorView('schedule');
-    } else if (val === triggerAttendant) {
-      setSimulatorView('attendant');
-    } else if (val === triggerLocation) {
-      setSimulatorView('location');
-    } else if (val === triggerExit) {
-      setSimulatorView('exit');
-    } else {
-      setSimulatorView('schedule');
+  // Inicializa o chat ou atualiza a saudação inicial em tempo real
+  useEffect(() => {
+    setSimStep('IDLE');
+    setSimSelectedService(null);
+    setSimSelectedDate(null);
+    setChatMessages([
+      { 
+        id: 1, 
+        sender: 'bot', 
+        text: renderFormattedGreeting(), 
+        time: '10:00',
+        quickReplies: getGreetingQuickReplies()
+      }
+    ]);
+  }, [businessName, greeting, triggerSchedule, triggerAttendant, triggerLocation, triggerExit]);
+
+  // Auto-scroll para acompanhar as novas mensagens no smartphone
+  useEffect(() => {
+    if (chatScrollRef.current) {
+      chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
     }
+  }, [chatMessages, isBotTyping]);
+
+  // Envio Interativo de Mensagem no Simulador com Resposta Inteligente e Máquina de Estados
+  const handleSendSimulatorMessage = (rawText) => {
+    const text = (rawText || simulatorCustomInput).trim();
+    if (!text) return;
     setSimulatorCustomInput('');
+
+    const nowTime = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    const userMsg = { id: Date.now(), sender: 'user', text, time: nowTime };
+    
+    setChatMessages(prev => [...prev, userMsg]);
+    setIsBotTyping(true);
+
+    setTimeout(() => {
+      setIsBotTyping(false);
+      const lower = text.toLowerCase().trim();
+      const cleanAlpha = text.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+      let reply = '';
+      let quickReplies = null;
+      let listOptions = null;
+      let nextStep = simStep;
+
+      // 0. Comandos Universais de Finalização / Voltar / Menu
+      const exitTrigger = (triggerExit || '0').trim().toLowerCase();
+      const attendantTrigger = (triggerAttendant || '2').trim().toLowerCase();
+      const locationTrigger = (triggerLocation || '3').trim().toLowerCase();
+      const scheduleTrigger = (triggerSchedule || '1').trim().toLowerCase();
+
+      if (lower === exitTrigger || lower === '0' || lower === 'sair' || lower === 'cancelar' || lower === 'finalizar') {
+        reply = 'Atendimento finalizado com sucesso! Se precisar de algo mais, estamos à disposição. Tenha um ótimo dia! 👋';
+        nextStep = 'IDLE';
+        quickReplies = [{ id: scheduleTrigger, label: '📅 Iniciar Novo Agendamento' }];
+      } else if (lower === 'menu' || lower === 'início' || lower === 'inicio' || lower === 'voltar' || lower === 'reiniciar') {
+        reply = renderFormattedGreeting();
+        nextStep = 'IDLE';
+        quickReplies = getGreetingQuickReplies();
+      } else if (lower === attendantTrigger || lower.includes('atendente') || lower.includes('humano')) {
+        reply = 'Transferindo seu contato para nossa equipe... Um atendente responderá aqui em instantes! 💬';
+        nextStep = 'IDLE';
+        quickReplies = [{ id: scheduleTrigger, label: '📅 Voltar ao Agendamento' }];
+      } else if (lower === locationTrigger || lower.includes('local') || lower.includes('onde')) {
+        reply = `📍 *Localização & Atendimento:*\n${businessName || 'Nosso Estabelecimento'}\nRua Principal, 120 - Sala 3. Atendimento com hora marcada! ✨\n\nDigite *${triggerSchedule || '1'}* para agendar ou *${triggerExit || '0'}* para sair.`;
+        quickReplies = [
+          { id: scheduleTrigger, label: '📅 Iniciar Agendamento' },
+          { id: exitTrigger, label: '🚪 Sair' }
+        ];
+      } else {
+        // 1. Processamento por Etapa da Máquina de Estados (State Machine)
+        const services = currentSegment.defaultServices || [];
+
+        // ETAPA IDLE
+        if (simStep === 'IDLE') {
+          const matchedFaq = customResponses.find(r => r.trigger && lower.includes(r.trigger.toLowerCase().trim()));
+          if (lower === scheduleTrigger || lower.includes('agendar') || lower.includes('agenda')) {
+            nextStep = 'AWAITING_SERVICE';
+            const servicesList = services.map((svc, idx) => {
+              const letter = String.fromCharCode(65 + idx);
+              return `*${letter}* - ${svc.name} (R$ ${svc.price.toFixed(2)})`;
+            }).join('\n');
+            reply = `✨ *Procedimentos Disponíveis em ${businessName || 'Nosso Espaço'}:*\n\n${servicesList}\n\nDigite a letra da opção (ex: *A*) ou toque no botão do serviço:`;
+            quickReplies = services.map((svc, idx) => ({
+              id: String.fromCharCode(65 + idx),
+              label: `${String.fromCharCode(65 + idx)} - ${svc.name}`
+            }));
+          } else if (matchedFaq) {
+            reply = matchedFaq.response;
+            quickReplies = getGreetingQuickReplies();
+          } else {
+            reply = renderFormattedGreeting();
+            quickReplies = getGreetingQuickReplies();
+          }
+        }
+
+        // ETAPA AWAITING_SERVICE (Escolha do Procedimento)
+        else if (simStep === 'AWAITING_SERVICE') {
+          let matchedSvc = null;
+          // Normaliza: remove barras, pontuações, extrai letra ou número
+          if (cleanAlpha.length > 0) {
+            const firstChar = cleanAlpha[0];
+            const letterIdx = firstChar.charCodeAt(0) - 65; // A = 0, B = 1...
+            if (letterIdx >= 0 && letterIdx < services.length) {
+              matchedSvc = services[letterIdx];
+            } else {
+              const numIdx = parseInt(firstChar, 10) - 1;
+              if (!isNaN(numIdx) && numIdx >= 0 && numIdx < services.length) {
+                matchedSvc = services[numIdx];
+              }
+            }
+          }
+
+          if (matchedSvc) {
+            setSimSelectedService(matchedSvc);
+            nextStep = 'AWAITING_DATE';
+            reply = `Excelente escolha para *${matchedSvc.name}*! ✨\n\n📅 *Para qual data gostaria de agendar?*\n\nSelecione uma das opções rápidas abaixo ou abra o calendário nativo (Flows):`;
+            quickReplies = [
+              { id: 'btn_hoje', label: '📅 Hoje' },
+              { id: 'btn_amanha', label: '🌅 Amanhã' },
+              { id: 'btn_outra_data', label: '🗓️ Outra data' },
+              { id: 'btn_flows', label: '✨ Abrir Calendário (Flows)' }
+            ];
+          } else {
+            // MENSAGEM DE TENTAR NOVAMENTE - NÃO RESETA PARA O MENU
+            nextStep = 'AWAITING_SERVICE';
+            reply = `⚠️ Opção não reconhecida.\n\nPor favor, escolha uma das letras dos procedimentos abaixo ou digite a letra correspondente (ex: *A*) (ou *${triggerExit || '0'}* para voltar):`;
+            quickReplies = services.map((svc, idx) => ({
+              id: String.fromCharCode(65 + idx),
+              label: `${String.fromCharCode(65 + idx)} - ${svc.name}`
+            }));
+          }
+        }
+
+        // ETAPA AWAITING_DATE / AWAITING_DATE_LIST (Escolha da Data)
+        else if (simStep === 'AWAITING_DATE' || simStep === 'AWAITING_DATE_LIST') {
+          const today = new Date();
+          const todayStr = today.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+          const tomorrow = new Date();
+          tomorrow.setDate(today.getDate() + 1);
+          const tomorrowStr = tomorrow.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+
+          // 1. WhatsApp Flows (Calendário Visual)
+          if (lower === 'btn_flows' || lower.includes('flows') || lower.includes('calendario') || lower.includes('calendário')) {
+            setShowFlowsModal(true);
+            reply = `✨ *WhatsApp Flows:* Abrindo o seletor nativo de calendário (DatePicker) na sua tela. Selecione o dia desejado no formulário:`;
+            quickReplies = [
+              { id: 'btn_hoje', label: '📅 Hoje' },
+              { id: 'btn_amanha', label: '🌅 Amanhã' },
+              { id: 'btn_outra_data', label: '🗓️ Outra data' }
+            ];
+          }
+          // 2. Quick Reply: Hoje
+          else if (lower === 'hoje' || lower === 'btn_hoje' || (lower === '1' && simStep === 'AWAITING_DATE')) {
+            setSimSelectedDate(`Hoje (${todayStr})`);
+            nextStep = 'AWAITING_TIME';
+            reply = `Perfeito! Data de *Hoje (${todayStr})* reservada. 🗓️\n\n⏰ *Horários disponíveis para hoje:*\n☀️ *Manhã:* 09:00, 10:30\n⛅ *Tarde:* 14:00, 16:30\n\nQual horário você prefere? Toque em um dos botões:`;
+            quickReplies = [
+              { id: '09:00', label: '☀️ 09:00' },
+              { id: '10:30', label: '☀️ 10:30' },
+              { id: '14:00', label: '⛅ 14:00' },
+              { id: '16:30', label: '⛅ 16:30' }
+            ];
+          }
+          // 2. Quick Reply: Amanhã
+          else if (lower === 'amanha' || lower === 'amanhã' || lower === 'btn_amanha' || (lower === '2' && simStep === 'AWAITING_DATE')) {
+            setSimSelectedDate(`Amanhã (${tomorrowStr})`);
+            nextStep = 'AWAITING_TIME';
+            reply = `Perfeito! Data de *Amanhã (${tomorrowStr})* reservada. 🗓️\n\n⏰ *Horários disponíveis para amanhã:*\n☀️ *Manhã:* 09:00, 11:00\n⛅ *Tarde:* 14:00, 15:30, 17:00\n\nQual horário você prefere? Toque em um dos botões:`;
+            quickReplies = [
+              { id: '09:00', label: '☀️ 09:00' },
+              { id: '11:00', label: '☀️ 11:00' },
+              { id: '14:00', label: '⛅ 14:00' },
+              { id: '15:30', label: '⛅ 15:30' }
+            ];
+          }
+          // 3. Quick Reply: Outra Data -> Mensagens de Lista (List Messages)
+          else if (lower === 'btn_outra_data' || lower === 'outra data' || lower === 'outra' || lower === 'outras' || lower === 'lista') {
+            nextStep = 'AWAITING_DATE_LIST';
+            const daysNames = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'];
+            const upcomingList = [];
+            for (let i = 2; i <= 6; i++) {
+              const d = new Date();
+              d.setDate(today.getDate() + i);
+              const fmt = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+              const wName = daysNames[d.getDay() === 0 ? 6 : d.getDay() - 1];
+              upcomingList.push({ id: fmt, label: `${wName}, ${fmt}` });
+            }
+            reply = `🗓️ *Mensagens de Lista (List Messages):*\n\nSelecione um dos próximos dias disponíveis na agenda abaixo:`;
+            listOptions = upcomingList;
+            quickReplies = [
+              { id: 'btn_hoje', label: '📅 Hoje' },
+              { id: 'btn_amanha', label: '🌅 Amanhã' },
+              { id: 'btn_flows', label: '✨ Abrir Calendário (Flows)' }
+            ];
+          }
+          // 4. Data digitada manualmente (ex: 15/10, 16/11) ou vinda de listOption/DatePicker
+          else {
+            const dateMatch = text.match(/(\d{1,2})[\/\-\.](\d{1,2})/);
+            if (dateMatch) {
+              const dStr = `${dateMatch[1].padStart(2, '0')}/${dateMatch[2].padStart(2, '0')}`;
+              setSimSelectedDate(dStr);
+              nextStep = 'AWAITING_TIME';
+              reply = `Ótimo! Data *${dStr}* anotada. 🗓️\n\n⏰ *Horários disponíveis para este dia:*\n☀️ *Manhã:* 09:30, 11:00\n⛅ *Tarde:* 14:00, 16:00\n\nQual horário você prefere? Toque em um dos botões:`;
+              quickReplies = [
+                { id: '09:30', label: '☀️ 09:30' },
+                { id: '11:00', label: '☀️ 11:00' },
+                { id: '14:00', label: '⛅ 14:00' },
+                { id: '16:00', label: '⛅ 16:00' }
+              ];
+            } else {
+              // MENSAGEM DE ERRO NA ESCOLHA DA DATA - SOLICITA TENTAR NOVAMENTE!
+              nextStep = 'AWAITING_DATE';
+              reply = `⚠️ Não entendi a data informada.\n\nPor favor, tente novamente escolhendo um dos botões rápidos abaixo ou digite no formato *DD/MM* (ex: 15/10):`;
+              quickReplies = [
+                { id: 'btn_hoje', label: '📅 Hoje' },
+                { id: 'btn_amanha', label: '🌅 Amanhã' },
+                { id: 'btn_outra_data', label: '🗓️ Outra data' },
+                { id: 'btn_flows', label: '✨ Abrir Calendário (Flows)' }
+              ];
+            }
+          }
+        }
+
+        // ETAPA AWAITING_TIME (Escolha do Horário)
+        else if (simStep === 'AWAITING_TIME') {
+          const timeMatch = text.match(/(\d{1,2})[:h](\d{2})?/i);
+          if (timeMatch || ['09:00', '10:30', '11:00', '14:00', '15:30', '16:00', '16:30'].includes(text)) {
+            const chosenTime = text.includes(':') ? text : timeMatch ? `${timeMatch[1].padStart(2, '0')}:${(timeMatch[2] || '00')}` : text;
+            nextStep = 'CONFIRMED';
+            reply = `🎉 *Agendamento Confirmado com Sucesso!*\n\n👤 *Cliente:* Amanda Silva\n💇 *Procedimento:* ${simSelectedService?.name || 'Procedimento'}\n📅 *Data:* ${simSelectedDate || 'Hoje'}\n⏰ *Horário:* ${chosenTime}\n💰 *Valor:* R$ ${(simSelectedService?.price || 45).toFixed(2)}\n📍 *Local:* ${businessName || 'Nosso Espaço'}\n\nAgradecemos a preferência! Te esperamos lá. ✨`;
+            quickReplies = [
+              { id: 'menu', label: '🔄 Iniciar Novo Agendamento' }
+            ];
+          } else {
+            nextStep = 'AWAITING_TIME';
+            reply = `⚠️ Horário não reconhecido.\n\nPor favor, escolha um dos horários disponíveis abaixo ou digite no formato *HH:MM* (ex: 14:00):`;
+            quickReplies = [
+              { id: '09:00', label: '☀️ 09:00' },
+              { id: '10:30', label: '☀️ 10:30' },
+              { id: '14:00', label: '⛅ 14:00' },
+              { id: '16:30', label: '⛅ 16:30' }
+            ];
+          }
+        }
+
+        // ETAPA CONFIRMED
+        else if (simStep === 'CONFIRMED') {
+          nextStep = 'IDLE';
+          reply = renderFormattedGreeting();
+          quickReplies = getGreetingQuickReplies();
+        }
+      }
+
+      setSimStep(nextStep);
+      setChatMessages(prev => [...prev, {
+        id: Date.now() + 1,
+        sender: 'bot',
+        text: reply,
+        time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+        quickReplies,
+        listOptions
+      }]);
+    }, 400);
+  };
+
+  // Reiniciar a conversa no simulador
+  const handleResetSimulatorChat = () => {
+    setSimStep('IDLE');
+    setSimSelectedService(null);
+    setSimSelectedDate(null);
+    setChatMessages([
+      { 
+        id: Date.now(), 
+        sender: 'bot', 
+        text: renderFormattedGreeting(), 
+        time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+        quickReplies: getGreetingQuickReplies()
+      }
+    ]);
   };
 
   return (
@@ -667,168 +942,297 @@ export default function BotConfig() {
           )}
         </div>
 
-        {/* Simulador / Preview WhatsApp em Tempo Real (Estilo Lypsyos WhatsApp Dark) */}
-        <div>
-          <div className="sticky top-6 bg-slate-900 text-white rounded-3xl p-5 shadow-2xl border border-slate-800 space-y-4">
+        {/* Simulador ao Vivo em Chassi de Smartphone Real (Design Instagram / Meta Standard) */}
+        <div className="w-full lg:w-[380px] shrink-0">
+          <div className="sticky top-6">
             
-            {/* Header do WhatsApp */}
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-full bg-emerald-500 flex items-center justify-center font-bold text-sm text-white shadow-md shadow-emerald-500/20">
-                  {currentSegment.icon || 'L'}
-                </div>
-                <div>
-                  <p className="text-xs font-bold leading-tight flex items-center gap-1.5 text-white">
-                    {businessName || 'Meu Estabelecimento'}
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                  </p>
-                  <p className="text-[10px] text-emerald-400 font-medium">Online 24h • URA Ativa</p>
-                </div>
-              </div>
-              <span className="text-[10px] bg-slate-800 text-slate-300 font-semibold px-2 py-0.5 rounded-full border border-slate-700">
-                Simulador Vivo
+            {/* Título & Botão de Recomeçar */}
+            <div className="flex items-center justify-between mb-3 px-2">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                <Smartphone className="w-4 h-4 text-emerald-500" />
+                Simulador ao Vivo (WhatsApp)
               </span>
+              <button
+                type="button"
+                onClick={handleResetSimulatorChat}
+                title="Reiniciar Simulação da Conversa"
+                className="inline-flex items-center gap-1 text-[11px] font-bold text-slate-500 dark:text-slate-400 hover:text-emerald-500 transition-colors cursor-pointer"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Reiniciar</span>
+              </button>
             </div>
 
-            {/* Balões de conversa WhatsApp (Atualização em Tempo Real) */}
-            <div className="space-y-3 text-xs max-h-[460px] overflow-y-auto pr-1">
+            {/* MOLDURA FÍSICA DO SMARTPHONE */}
+            <div className="relative mx-auto w-full max-w-[340px] rounded-[50px] border-[10px] border-slate-950 dark:border-slate-800 bg-slate-950 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.5)] overflow-hidden transition-all duration-300">
               
-              {/* Balão 1 (Bot): Auto-Greeting + Menu Numérico URA */}
-              <div className="bg-slate-800/90 rounded-2xl rounded-tl-none p-3.5 border border-slate-700/60 max-w-[88%] text-slate-200 whitespace-pre-wrap leading-relaxed shadow-sm">
-                {renderFormattedGreeting()}
-                <div className="text-[9px] text-slate-400 text-right mt-1.5">10:00</div>
+              {/* Dynamic Island / Notch */}
+              <div className="absolute top-2 left-1/2 -translate-x-1/2 w-24 h-5 bg-black rounded-full z-30 flex items-center justify-between px-3">
+                <span className="w-2.5 h-2.5 rounded-full bg-slate-900 border border-slate-800"></span>
+                <span className="w-2 h-2 rounded-full bg-blue-950/60"></span>
               </div>
 
-              {/* Balão 2 (Cliente): Opção Digitada pelo Usuário */}
-              <div className="bg-emerald-600 rounded-2xl rounded-tr-none p-2.5 px-3.5 ml-auto max-w-[70%] text-white shadow-md text-right font-medium">
-                {simulatorView === 'schedule' && (triggerSchedule || '1')}
-                {simulatorView === 'attendant' && (triggerAttendant || '2')}
-                {simulatorView === 'location' && (triggerLocation || '3')}
-                {simulatorView === 'exit' && (triggerExit || '0')}
-                <div className="text-[9px] text-emerald-200 text-right mt-0.5">10:01 ✓✓</div>
+              {/* Barra de Status do Sistema Operacional (iOS/Android) */}
+              <div className="pt-2 px-6 pb-1 flex items-center justify-between text-white text-[11px] font-bold z-20 relative bg-[#0b141a]">
+                <span>9:41</span>
+                <div className="flex items-center gap-1.5 text-[10px]">
+                  <span>5G</span>
+                  <span className="w-3.5 h-2 rounded-xs border border-white flex items-center p-0.2">
+                    <span className="h-full w-full bg-white rounded-2xs"></span>
+                  </span>
+                </div>
               </div>
 
-              {/* Balão 3 (Bot): Resposta Dinâmica Baseada no Gatilho */}
-              {simulatorView === 'schedule' && (
-                <div className="bg-slate-800/90 rounded-2xl rounded-tl-none p-3.5 border border-slate-700/60 max-w-[90%] text-slate-200 shadow-sm space-y-2">
-                  <p className="font-bold text-emerald-400">
-                    ✨ Procedimentos Disponíveis em {businessName || 'Nosso Estabelecimento'}:
-                  </p>
-                  <div className="space-y-1.5 text-[11px] text-slate-300">
-                    {currentSegment.defaultServices.map((svc, idx) => {
-                      const letter = String.fromCharCode(65 + idx); // A, B, C, D...
-                      return (
-                        <div key={idx} className="flex items-center justify-between gap-2 border-b border-slate-700/40 pb-1">
-                          <span>
-                            <strong className="text-white">*{letter}*</strong> - {svc.name}
-                          </span>
-                          <span className="text-emerald-300 font-semibold whitespace-nowrap">
-                            R$ {svc.price.toFixed(2)}
-                          </span>
-                        </div>
-                      );
-                    })}
+              {/* TOP BAR OFICIAL DO WHATSAPP BUSINESS */}
+              <div className="bg-[#1f2c34] text-white px-3 py-2.5 flex items-center justify-between border-b border-[#2a3942] z-20 relative shadow-sm">
+                <div className="flex items-center gap-2 overflow-hidden">
+                  <div className="w-9 h-9 rounded-full bg-emerald-600 flex items-center justify-center font-bold text-sm text-white shrink-0 shadow-md">
+                    {avatarUrl ? (
+                      <img src={avatarUrl} alt="Avatar" className="w-full h-full rounded-full object-cover" />
+                    ) : (
+                      currentSegment.icon || '🏪'
+                    )}
                   </div>
-                  <p className="text-[10px] text-slate-400 pt-1">
-                    Digite a letra da opção (ex: <strong className="text-white">*A*</strong>) ou <strong className="text-white">*{triggerExit || '0'}*</strong> para voltar:
-                  </p>
-                  <div className="text-[9px] text-slate-400 text-right mt-1">10:01</div>
+                  <div className="overflow-hidden">
+                    <div className="flex items-center gap-1">
+                      <p className="text-xs font-bold text-white truncate max-w-[130px]">
+                        {businessName || 'Meu Negócio'}
+                      </p>
+                      <BadgeCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                    </div>
+                    <p className="text-[10px] text-emerald-400 font-medium flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                      online
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 text-slate-300">
+                  <Video className="w-4 h-4 cursor-pointer hover:text-white" />
+                  <Phone className="w-4 h-4 cursor-pointer hover:text-white" />
+                  <MoreVertical className="w-4 h-4 cursor-pointer hover:text-white" />
+                </div>
+              </div>
+
+              {/* TELA DE CHAT WHATSAPP COM WALLPAPER REAL */}
+              <div 
+                ref={chatScrollRef}
+                className="h-[410px] overflow-y-auto p-3 space-y-2.5 text-xs bg-[#0b141a] relative scroll-smooth"
+                style={{
+                  backgroundImage: `radial-gradient(#182229 1px, transparent 1px)`,
+                  backgroundSize: '16px 16px'
+                }}
+              >
+                {/* Chip de Criptografia do WhatsApp */}
+                <div className="flex justify-center my-1">
+                  <span className="bg-[#182229] text-[#ffd279] text-[9px] px-2.5 py-1 rounded-lg text-center max-w-[90%] shadow-2xs leading-tight">
+                    🔒 Mensagens protegidas com criptografia de ponta a ponta do WhatsApp.
+                  </span>
+                </div>
+
+                {/* Stream de Mensagens da Conversa */}
+                {chatMessages.map((msg) => {
+                  const isBot = msg.sender === 'bot';
+                  return (
+                    <div 
+                      key={msg.id} 
+                      className={`flex flex-col ${isBot ? 'items-start' : 'items-end'}`}
+                    >
+                      <div className={`p-2.5 px-3 rounded-2xl max-w-[85%] whitespace-pre-wrap leading-relaxed shadow-sm text-xs ${
+                        isBot 
+                          ? 'bg-[#202c33] text-[#e9edef] rounded-tl-xs border border-[#2a3942]/60' 
+                          : 'bg-[#005c4b] text-[#e9edef] rounded-tr-xs'
+                      }`}>
+                        {msg.text}
+
+                        {/* Botões de Resposta Rápida (Quick Replies) do WhatsApp */}
+                        {msg.quickReplies && (
+                          <div className="mt-2.5 pt-2 border-t border-[#2a3942]/80 flex flex-col gap-1.5">
+                            {msg.quickReplies.map((btn) => (
+                              <button
+                                key={btn.id}
+                                type="button"
+                                onClick={() => handleSendSimulatorMessage(btn.id)}
+                                className="w-full bg-[#182229] hover:bg-[#2a3942] active:scale-[0.98] text-[#53bdeb] hover:text-white border border-[#2a3942] rounded-xl py-1.5 px-2.5 text-[11px] font-bold text-center transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                              >
+                                <span>{btn.label}</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Mensagens de Lista (List Messages) */}
+                        {msg.listOptions && (
+                          <div className="mt-2.5 pt-2 border-t border-[#2a3942]/80 space-y-1.5">
+                            <span className="text-[10px] text-[#8696a0] font-semibold block">
+                              📋 Selecione uma opção da lista:
+                            </span>
+                            {msg.listOptions.map((opt) => (
+                              <button
+                                key={opt.id}
+                                type="button"
+                                onClick={() => handleSendSimulatorMessage(opt.id)}
+                                className="w-full bg-[#182229] hover:bg-[#2a3942] active:scale-[0.98] text-white border border-[#2a3942] rounded-xl p-2 text-[11px] font-medium transition-all flex items-center justify-between cursor-pointer"
+                              >
+                                <span>{opt.label}</span>
+                                <span className="text-[10px] text-emerald-400 font-bold">Escolher →</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+
+                        <div className={`text-[9px] text-right mt-1.5 flex items-center justify-end gap-1 ${
+                          isBot ? 'text-[#8696a0]' : 'text-[#8696a0]'
+                        }`}>
+                          <span>{msg.time}</span>
+                          {!isBot && <CheckCheck className="w-3 h-3 text-[#53bdeb]" />}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {/* Indicador de "Digitando..." Animado */}
+                {isBotTyping && (
+                  <div className="flex items-center gap-1 bg-[#202c33] text-[#8696a0] px-3 py-2 rounded-2xl rounded-tl-xs w-20 shadow-sm border border-[#2a3942]/60">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-bounce"></span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-bounce [animation-delay:0.2s]"></span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-bounce [animation-delay:0.4s]"></span>
+                  </div>
+                )}
+              </div>
+
+              {/* Modal Nativo WhatsApp Flows (Componente DatePicker) */}
+              {showFlowsModal && (
+                <div className="absolute inset-0 bg-black/75 backdrop-blur-xs z-40 flex items-end animate-in fade-in duration-200">
+                  <div className="bg-[#1f2c34] text-white w-full rounded-t-3xl p-4 border-t border-[#2a3942] shadow-2xl space-y-3">
+                    <div className="flex items-center justify-between pb-2 border-b border-[#2a3942]">
+                      <div className="flex items-center gap-2">
+                        <Calendar className="w-4 h-4 text-emerald-400" />
+                        <h4 className="text-xs font-bold text-white">WhatsApp Flows • DatePicker</h4>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowFlowsModal(false)}
+                        className="text-[#8696a0] hover:text-white p-1 rounded-full cursor-pointer"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    <p className="text-[10px] text-[#8696a0] leading-relaxed">
+                      Formulário com seletor de calendário nativo do WhatsApp Flows. Escolha o dia da sessão:
+                    </p>
+
+                    <div className="bg-[#111b21] p-3 rounded-2xl border border-[#2a3942]">
+                      <label className="text-[10px] font-bold text-[#8696a0] uppercase block mb-1">
+                        Data do Agendamento
+                      </label>
+                      <input
+                        type="date"
+                        value={flowsDate}
+                        min={new Date().toISOString().split('T')[0]}
+                        onChange={(e) => setFlowsDate(e.target.value)}
+                        className="w-full bg-[#202c33] text-white rounded-xl p-2.5 text-xs border border-[#2a3942] focus:outline-none focus:border-emerald-500 font-semibold cursor-pointer"
+                      />
+                    </div>
+
+                    <div className="flex gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => setShowFlowsModal(false)}
+                        className="flex-1 py-2 rounded-xl bg-[#2a3942] hover:bg-[#32444f] text-[#8696a0] text-xs font-bold transition-all cursor-pointer"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowFlowsModal(false);
+                          const [y, m, d] = flowsDate.split('-');
+                          handleSendSimulatorMessage(`${d}/${m}`);
+                        }}
+                        className="flex-1 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold transition-all shadow-md cursor-pointer flex items-center justify-center gap-1"
+                      >
+                        <CheckCheck className="w-3.5 h-3.5" />
+                        <span>Confirmar Data</span>
+                      </button>
+                    </div>
+                  </div>
                 </div>
               )}
 
-              {simulatorView === 'attendant' && (
-                <div className="bg-slate-800/90 rounded-2xl rounded-tl-none p-3.5 border border-slate-700/60 max-w-[88%] text-slate-200 shadow-sm">
-                  <p className="text-slate-200 leading-relaxed">
-                    Transferindo seu contato para nossa equipe... Um atendente responderá aqui em instantes! 💬
-                  </p>
-                  <div className="text-[9px] text-slate-400 text-right mt-1.5">10:01</div>
-                </div>
-              )}
-
-              {simulatorView === 'location' && (
-                <div className="bg-slate-800/90 rounded-2xl rounded-tl-none p-3.5 border border-slate-700/60 max-w-[88%] text-slate-200 shadow-sm space-y-1">
-                  <p className="font-bold text-emerald-400">📍 Localização & Atendimento:</p>
-                  <p className="text-slate-300">{businessName || 'Nosso Estabelecimento'}</p>
-                  <p className="text-[11px] text-slate-400">Rua Principal, 120 - Sala 3. Atendimento com hora marcada.</p>
-                  <div className="text-[9px] text-slate-400 text-right mt-1.5">10:01</div>
-                </div>
-              )}
-
-              {simulatorView === 'exit' && (
-                <div className="bg-slate-800/90 rounded-2xl rounded-tl-none p-3.5 border border-slate-700/60 max-w-[88%] text-slate-200 shadow-sm">
-                  <p className="text-slate-200 leading-relaxed">
-                    Atendimento finalizado. Se precisar de algo mais, estamos à disposição! Tenha um ótimo dia! 👋
-                  </p>
-                  <div className="text-[9px] text-slate-400 text-right mt-1.5">10:01</div>
-                </div>
-              )}
-            </div>
-
-            {/* Barra de Testes Rápidos da URA */}
-            <div className="pt-3 border-t border-slate-800 space-y-2">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                Simular Resposta do Cliente:
-              </p>
-              <div className="grid grid-cols-2 gap-1.5">
+              {/* CHIPS DE SUGESTÃO RÁPIDA (1 TOQUE PARA TESTAR) */}
+              <div className="bg-[#1f2c34] px-2 py-1.5 border-t border-[#2a3942] flex items-center gap-1.5 overflow-x-auto scrollbar-none">
                 <button
-                  onClick={() => setSimulatorView('schedule')}
-                  className={`text-[11px] font-bold p-1.5 px-2.5 rounded-xl border text-left transition-all cursor-pointer ${
-                    simulatorView === 'schedule'
-                      ? 'bg-blue-600 text-white border-blue-500 shadow-sm'
-                      : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
-                  }`}
+                  type="button"
+                  onClick={() => handleSendSimulatorMessage(triggerSchedule || '1')}
+                  className="px-2.5 py-1 rounded-full bg-[#2a3942] hover:bg-[#32444f] text-[#53bdeb] text-[10px] font-bold shrink-0 transition-colors cursor-pointer"
                 >
-                  Digitou {triggerSchedule || '1'} (Agendar)
+                  📅 {triggerSchedule || '1'} (Agendar)
                 </button>
                 <button
-                  onClick={() => setSimulatorView('attendant')}
-                  className={`text-[11px] font-bold p-1.5 px-2.5 rounded-xl border text-left transition-all cursor-pointer ${
-                    simulatorView === 'attendant'
-                      ? 'bg-blue-600 text-white border-blue-500 shadow-sm'
-                      : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
-                  }`}
+                  type="button"
+                  onClick={() => handleSendSimulatorMessage(triggerAttendant || '2')}
+                  className="px-2.5 py-1 rounded-full bg-[#2a3942] hover:bg-[#32444f] text-emerald-400 text-[10px] font-bold shrink-0 transition-colors cursor-pointer"
                 >
-                  Digitou {triggerAttendant || '2'} (Humano)
+                  👤 {triggerAttendant || '2'} (Humano)
                 </button>
                 <button
-                  onClick={() => setSimulatorView('location')}
-                  className={`text-[11px] font-bold p-1.5 px-2.5 rounded-xl border text-left transition-all cursor-pointer ${
-                    simulatorView === 'location'
-                      ? 'bg-blue-600 text-white border-blue-500 shadow-sm'
-                      : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
-                  }`}
+                  type="button"
+                  onClick={() => handleSendSimulatorMessage(triggerLocation || '3')}
+                  className="px-2.5 py-1 rounded-full bg-[#2a3942] hover:bg-[#32444f] text-amber-300 text-[10px] font-bold shrink-0 transition-colors cursor-pointer"
                 >
-                  Digitou {triggerLocation || '3'} (Local)
+                  📍 {triggerLocation || '3'} (Local)
                 </button>
                 <button
-                  onClick={() => setSimulatorView('exit')}
-                  className={`text-[11px] font-bold p-1.5 px-2.5 rounded-xl border text-left transition-all cursor-pointer ${
-                    simulatorView === 'exit'
-                      ? 'bg-rose-600 text-white border-rose-500 shadow-sm'
-                      : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
-                  }`}
+                  type="button"
+                  onClick={() => handleSendSimulatorMessage('preço')}
+                  className="px-2.5 py-1 rounded-full bg-[#2a3942] hover:bg-[#32444f] text-purple-300 text-[10px] font-bold shrink-0 transition-colors cursor-pointer"
                 >
-                  Digitou {triggerExit || '0'} (Sair)
+                  💳 Preço
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSendSimulatorMessage(triggerExit || '0')}
+                  className="px-2.5 py-1 rounded-full bg-[#2a3942] hover:bg-[#32444f] text-rose-400 text-[10px] font-bold shrink-0 transition-colors cursor-pointer"
+                >
+                  🚪 {triggerExit || '0'} (Sair)
                 </button>
               </div>
 
-              {/* Mini Campo de Entrada Interativa */}
-              <form onSubmit={handleTestSimulatorInput} className="flex items-center gap-1.5 pt-2">
-                <input
-                  type="text"
-                  placeholder="Digite 1, 2, 3 ou 0..."
-                  value={simulatorCustomInput}
-                  onChange={(e) => setSimulatorCustomInput(e.target.value)}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
-                />
+              {/* BARRA DE ENTRADA DO WHATSAPP COM BOTÃO DE ENVIO */}
+              <form 
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleSendSimulatorMessage();
+                }}
+                className="bg-[#1f2c34] p-2 flex items-center gap-1.5 border-t border-[#2a3942]"
+              >
+                <div className="flex-1 flex items-center gap-2 bg-[#2a3942] rounded-full px-3 py-1.5">
+                  <Smile className="w-4 h-4 text-[#8696a0]" />
+                  <input
+                    type="text"
+                    value={simulatorCustomInput}
+                    onChange={(e) => setSimulatorCustomInput(e.target.value)}
+                    placeholder="Digite uma mensagem..."
+                    className="w-full bg-transparent text-white placeholder-[#8696a0] text-xs focus:outline-none"
+                  />
+                </div>
+
                 <button
                   type="submit"
-                  className="bg-emerald-500 hover:bg-emerald-600 text-white p-1.5 rounded-xl transition-colors cursor-pointer"
-                  title="Testar comando"
+                  disabled={!simulatorCustomInput.trim()}
+                  className="w-8 h-8 rounded-full bg-emerald-500 hover:bg-emerald-600 disabled:opacity-40 text-white flex items-center justify-center shrink-0 transition-all cursor-pointer shadow-md"
                 >
-                  <Send className="w-4 h-4" />
+                  <Send className="w-3.5 h-3.5 fill-current ml-0.5" />
                 </button>
               </form>
+
+              {/* Barra de Navegação Inferior do Celular (Home Bar) */}
+              <div className="h-4 bg-[#1f2c34] flex items-center justify-center pb-1">
+                <span className="w-24 h-1 bg-slate-600 rounded-full"></span>
+              </div>
             </div>
           </div>
         </div>

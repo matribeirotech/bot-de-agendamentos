@@ -104,24 +104,30 @@ export const useAppStore = create(
         })),
 
       // Carregar Perfil Completo (Multi-Layer com Fallback Infalível)
-      loadUserProfile: async (emailHint) => {
+      loadUserProfile: async (emailHint, userIdHint) => {
         const state = get();
         let targetEmail = (emailHint || state.email || '').toLowerCase().trim();
+        let currentUserId = userIdHint || null;
         let loaded = {};
 
-        // 1. Camada 1: Supabase Auth Session & Metadata
+        // 1. Camada 1: Supabase Auth Server (sempre busca dados frescos via getUser)
         if (isSupabaseConfigured()) {
           try {
-            const { data: { session } } = await supabase.auth.getSession();
-            const user = session?.user;
+            const { data: userData, error: userFetchErr } = await supabase.auth.getUser();
+            const user = userData?.user;
             if (user) {
+              currentUserId = user.id;
               targetEmail = (user.email || targetEmail).toLowerCase().trim();
               loaded.email = user.email;
 
               const meta = user.user_metadata || {};
               if (meta.nome_salao) loaded.businessName = meta.nome_salao;
-              if (meta.nome_completo) loaded.responsibleName = meta.nome_completo;
-              if (meta.whatsapp) loaded.whatsapp = meta.whatsapp;
+              if (meta.nome_completo && meta.nome_completo !== 'Amanda Silva') {
+                loaded.responsibleName = meta.nome_completo;
+              }
+              if (meta.whatsapp && meta.whatsapp !== '11999999999' && meta.whatsapp !== '5511999999999') {
+                loaded.whatsapp = meta.whatsapp;
+              }
               if (meta.avatar_url) loaded.avatarUrl = meta.avatar_url;
               if (meta.chave_pix) loaded.pixKey = meta.chave_pix;
               if (meta.tipo_chave_pix) loaded.pixType = meta.tipo_chave_pix;
@@ -139,13 +145,16 @@ export const useAppStore = create(
 
               if (dbUser) {
                 if (dbUser.nome_salao) loaded.businessName = dbUser.nome_salao;
-                if (dbUser.nome_completo) loaded.responsibleName = dbUser.nome_completo;
-                if (dbUser.whatsapp) loaded.whatsapp = dbUser.whatsapp;
+                if (dbUser.nome_completo && dbUser.nome_completo !== 'Amanda Silva') {
+                  loaded.responsibleName = dbUser.nome_completo;
+                }
+                if (dbUser.whatsapp && dbUser.whatsapp !== '11999999999' && dbUser.whatsapp !== '5511999999999') {
+                  loaded.whatsapp = dbUser.whatsapp;
+                }
                 if (dbUser.avatar_url) loaded.avatarUrl = dbUser.avatar_url;
                 if (dbUser.chave_pix) loaded.pixKey = dbUser.chave_pix;
                 if (dbUser.tipo_chave_pix) loaded.pixType = dbUser.tipo_chave_pix;
                 if (dbUser.cor_primaria) loaded.themeColor = dbUser.cor_primaria;
-                if (dbUser.theme_mode) loaded.themeMode = dbUser.theme_mode;
                 if (dbUser.bio) loaded.bio = dbUser.bio;
                 if (dbUser.segmento) loaded.segment = dbUser.segmento;
               }
@@ -155,13 +164,31 @@ export const useAppStore = create(
           }
         }
 
-        // 2. Camada 2: Cache LocalStorage Específico por E-mail
-        if (targetEmail) {
+        // 2. Camada 2: Caches Locais (UID do Usuário, E-mail e Global)
+        const cacheCandidates = [];
+        if (currentUserId) cacheCandidates.push(`lypsyos_profile_uid_${currentUserId}`);
+        if (targetEmail) cacheCandidates.push(`lypsyos_profile_${targetEmail}`);
+        cacheCandidates.push(GLOBAL_PROFILE_KEY);
+
+        for (const cacheKey of cacheCandidates) {
           try {
-            const rawCache = localStorage.getItem(`lypsyos_profile_${targetEmail}`);
-            if (rawCache) {
-              const parsed = JSON.parse(rawCache);
+            const raw = localStorage.getItem(cacheKey);
+            if (raw) {
+              const parsed = JSON.parse(raw);
               if (parsed && typeof parsed === 'object') {
+                // Recupera nome e whatsapp do cache se no banco/meta estiver vazio ou com o placeholder Amanda Silva
+                if (parsed.responsibleName && (!loaded.responsibleName || loaded.responsibleName === 'Amanda Silva')) {
+                  loaded.responsibleName = parsed.responsibleName;
+                }
+                if (parsed.whatsapp && (!loaded.whatsapp || loaded.whatsapp === '11999999999' || loaded.whatsapp === '5511999999999')) {
+                  loaded.whatsapp = parsed.whatsapp;
+                }
+                if (parsed.email && !loaded.email) {
+                  loaded.email = parsed.email;
+                }
+                if (parsed.avatarUrl && !loaded.avatarUrl) {
+                  loaded.avatarUrl = parsed.avatarUrl;
+                }
                 for (const key of Object.keys(parsed)) {
                   if (parsed[key] && !loaded[key]) {
                     loaded[key] = parsed[key];
@@ -169,27 +196,10 @@ export const useAppStore = create(
                 }
               }
             }
-          } catch (e) {
-            console.warn('Erro ao ler cache do usuário:', e);
-          }
+          } catch (e) {}
         }
 
-        // 3. Camada 3: Cache LocalStorage Global Ativo (Fallback)
-        try {
-          const rawGlobal = localStorage.getItem(GLOBAL_PROFILE_KEY);
-          if (rawGlobal) {
-            const parsedGlobal = JSON.parse(rawGlobal);
-            if (parsedGlobal && typeof parsedGlobal === 'object') {
-              for (const key of Object.keys(parsedGlobal)) {
-                if (parsedGlobal[key] && !loaded[key]) {
-                  loaded[key] = parsedGlobal[key];
-                }
-              }
-            }
-          }
-        } catch (e) {}
-
-        // 4. Camada 4: Backend Django (Nome do Estabelecimento do Bot / Tenant)
+        // 3. Camada 3: Backend Django (Nome do Estabelecimento do Bot / Tenant)
         try {
           const res = await axios.get('http://localhost:8000/api/v1/bot/config/');
           if (res.data?.business_name && (!loaded.businessName || loaded.businessName === 'Meu Estabelecimento')) {
@@ -208,11 +218,14 @@ export const useAppStore = create(
           };
           set(merged);
 
-          // Mantém ambos os caches salvos e consistentes
+          // Salva todos os caches sincronizados e consistentes
           try {
             localStorage.setItem(GLOBAL_PROFILE_KEY, JSON.stringify(merged));
             if (targetEmail) {
               localStorage.setItem(`lypsyos_profile_${targetEmail}`, JSON.stringify(merged));
+            }
+            if (currentUserId) {
+              localStorage.setItem(`lypsyos_profile_uid_${currentUserId}`, JSON.stringify(merged));
             }
           } catch (e) {}
 
@@ -228,25 +241,16 @@ export const useAppStore = create(
         const merged = { ...state, ...formData };
         set(merged);
 
-        let email = (merged.email || '').toLowerCase().trim();
+        let email = (formData.email || merged.email || '').toLowerCase().trim();
 
-        // Se o e-mail não foi informado no formulário, tenta obter do Supabase
-        if (!email && isSupabaseConfigured()) {
-          try {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (session?.user?.email) {
-              email = session.user.email.toLowerCase().trim();
-              merged.email = email;
-              set({ email });
-            }
-          } catch (e) {}
-        }
-
-        // 1. Salva nos caches locais imediatamente
+        // 1. Salva nos caches locais imediatamente (Global e por E-mail)
         try {
           localStorage.setItem(GLOBAL_PROFILE_KEY, JSON.stringify(merged));
           if (email) {
             localStorage.setItem(`lypsyos_profile_${email}`, JSON.stringify(merged));
+          }
+          if (state.email && state.email !== email) {
+            localStorage.setItem(`lypsyos_profile_${state.email.toLowerCase().trim()}`, JSON.stringify(merged));
           }
         } catch (e) {
           console.warn('Erro ao salvar cache local:', e);
@@ -261,28 +265,49 @@ export const useAppStore = create(
             const currentMode = formData.themeMode || merged.themeMode || 'light';
             const currentColor = formData.themeColor || merged.themeColor || '#2563eb';
 
-            // Metadados do Supabase Auth (pequenos e seguros para evitar limite de tamanho)
+            // Metadados do Supabase Auth (seguros para evitar limite de tamanho)
             const safeAvatarForMeta = (formData.avatarUrl && !formData.avatarUrl.startsWith('data:'))
               ? formData.avatarUrl
               : '';
 
-            await supabase.auth.updateUser({
+            const authUpdatePayload = {
               data: {
                 nome_completo: respName,
                 nome_salao: salon,
                 whatsapp: phone,
                 avatar_url: safeAvatarForMeta,
-                chave_pix: formData.pixKey ?? merged.pixKey ?? '',
+                chave_pix: (formData.pixKey ?? merged.pixKey ?? '').trim(),
                 tipo_chave_pix: formData.pixType ?? merged.pixType ?? 'TELEFONE',
                 cor_primaria: currentColor,
                 theme_mode: currentMode,
-                bio: formData.bio ?? merged.bio ?? '',
+                bio: (formData.bio ?? merged.bio ?? '').trim(),
                 segmento: formData.segment ?? merged.segment ?? 'manicure'
               }
-            });
+            };
 
+            // Se o e-mail foi alterado no formulário, envia no payload raiz do Auth
             const { data: { user } } = await supabase.auth.getUser();
             if (user) {
+              if (email && email !== user.email?.toLowerCase().trim()) {
+                authUpdatePayload.email = email;
+              }
+
+              // Salva no cache por UID do usuário
+              try {
+                localStorage.setItem(`lypsyos_profile_uid_${user.id}`, JSON.stringify(merged));
+              } catch (e) {}
+
+              // Atualiza os metadados do Supabase Auth
+              const { error: authErr } = await supabase.auth.updateUser(authUpdatePayload);
+              if (authErr) {
+                console.warn('Supabase updateUser info:', authErr.message);
+              }
+
+              // Força o refresh da sessão para sincronizar os tokens JWT locais
+              try {
+                await supabase.auth.refreshSession();
+              } catch (refErr) {}
+
               // Tabela public.usuarios (estritamente as colunas existentes no schema)
               const usuarioRow = {
                 id: user.id,

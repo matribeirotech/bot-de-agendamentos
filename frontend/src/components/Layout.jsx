@@ -1,9 +1,9 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, CalendarClock, Bot, Megaphone, SlidersHorizontal, 
   MessageCircle, Sparkles, Crown, ArrowRight, UserCheck, LogOut,
-  Sun, Moon, Palette
+  Sun, Moon, Palette, Smartphone, Download, Share, PlusSquare, X
 } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { SEGMENTS } from '../lib/segmentSeeds';
@@ -27,12 +27,73 @@ export default function Layout() {
     if (isSupabaseConfigured()) {
       const { data: { subscription: authSub } } = supabase.auth.onAuthStateChange(async (event, session) => {
         if (session?.user?.email) {
-          await loadUserProfile(session.user.email);
+          await loadUserProfile(session.user.email, session.user.id);
         }
       });
       return () => authSub?.unsubscribe();
     }
   }, [loadUserProfile]);
+
+  // Controle de PWA e Instalação em 1 Toque
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const [isStandalone, setIsStandalone] = useState(false);
+  const [showIosInstallModal, setShowIosInstallModal] = useState(false);
+  const [dismissInstallBanner, setDismissInstallBanner] = useState(() => {
+    try {
+      return sessionStorage.getItem('lypsyos_dismiss_pwa_banner') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  useEffect(() => {
+    // Detecta se já está rodando em modo standalone (PWA instalado)
+    const isStandaloneMode = 
+      window.matchMedia('(display-mode: standalone)').matches || 
+      window.navigator.standalone === true;
+    setIsStandalone(isStandaloneMode);
+
+    const handleBeforeInstall = (e) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+
+    const handleAppInstalled = () => {
+      setIsStandalone(true);
+      setDeferredPrompt(null);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstall);
+    window.addEventListener('appinstalled', handleAppInstalled);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
+      window.removeEventListener('appinstalled', handleAppInstalled);
+    };
+  }, []);
+
+  const handleInstallClick = async () => {
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        setIsStandalone(true);
+      }
+      setDeferredPrompt(null);
+    } else if (isIOS) {
+      setShowIosInstallModal(true);
+    } else {
+      navigate('/settings');
+    }
+  };
+
+  const handleDismissBanner = () => {
+    setDismissInstallBanner(true);
+    try {
+      sessionStorage.setItem('lypsyos_dismiss_pwa_banner', 'true');
+    } catch {}
+  };
 
   const navItems = [
     { name: 'Dashboard', path: '/', icon: LayoutDashboard },
@@ -126,6 +187,29 @@ export default function Layout() {
               )}
             </button>
           </div>
+
+          {/* Botão de Instalação PWA no Desktop */}
+          {!isStandalone && (
+            <button
+              onClick={handleInstallClick}
+              className="mt-2.5 w-full flex items-center justify-between px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700/60 hover:border-blue-400 dark:hover:border-blue-500 hover:bg-blue-50/50 dark:hover:bg-blue-950/20 text-slate-700 dark:text-slate-200 text-xs font-semibold transition-all group cursor-pointer shadow-2xs"
+              title="Instalar Lypsyos como Aplicativo"
+            >
+              <div className="flex items-center gap-2">
+                <div 
+                  className="w-6 h-6 rounded-lg flex items-center justify-center text-white text-[10px]"
+                  style={{ backgroundColor: themeColor || '#2563eb' }}
+                >
+                  <Smartphone className="w-3.5 h-3.5" />
+                </div>
+                <div className="text-left">
+                  <span className="block leading-tight text-[11px] font-bold">Instalar App</span>
+                  <span className="block text-[9px] text-slate-400 dark:text-slate-500 font-medium leading-none">Acesso em 1 clique</span>
+                </div>
+              </div>
+              <Download className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" />
+            </button>
+          )}
         </div>
 
         {/* NAVEGAÇÃO PRINCIPAL */}
@@ -268,6 +352,17 @@ export default function Layout() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            {!isStandalone && (
+              <button
+                onClick={handleInstallClick}
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold text-white shadow-xs transition-transform active:scale-95 cursor-pointer"
+                style={{ backgroundColor: themeColor || '#2563eb' }}
+                title="Instalar App no celular"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span className="text-[11px]">Instalar</span>
+              </button>
+            )}
             <button
               onClick={toggleQuickTheme}
               title="Alternar Tema"
@@ -319,6 +414,116 @@ export default function Layout() {
       >
         <MessageCircle className="w-6 h-6 fill-current" />
       </a>
+
+      {/* Banner Flutuante de Instalação Mobile (PWA 1-Toque) */}
+      {!isStandalone && !dismissInstallBanner && (
+        <aside 
+          aria-label="Instalação do Aplicativo"
+          className="fixed bottom-18 left-3 right-3 md:hidden z-35"
+        >
+          <div className="bg-slate-900/95 dark:bg-slate-900/95 text-white p-3 rounded-2xl shadow-2xl backdrop-blur-md border border-slate-700/80 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div 
+                className="w-9 h-9 rounded-xl flex items-center justify-center text-white shrink-0 shadow-sm font-black text-xs"
+                style={{ backgroundColor: themeColor || '#2563eb' }}
+              >
+                L
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-extrabold text-white leading-tight truncate">
+                  Instalar App no Celular
+                </p>
+                <p className="text-[10px] text-slate-300 leading-tight truncate">
+                  Acesso rápido direto da sua tela inicial
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={handleInstallClick}
+                style={{ backgroundColor: themeColor || '#2563eb' }}
+                className="px-3 py-1.5 rounded-xl text-white text-xs font-bold shadow-md hover:opacity-90 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Instalar</span>
+              </button>
+              <button
+                onClick={handleDismissBanner}
+                className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
+                title="Fechar aviso de instalação"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </aside>
+      )}
+
+      {/* Modal Guia de Instalação para iOS Safari */}
+      {showIosInstallModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-end sm:items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-100 dark:border-slate-800">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2.5">
+                <div 
+                  className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-black text-sm shadow-sm"
+                  style={{ backgroundColor: themeColor || '#2563eb' }}
+                >
+                  L
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-slate-900 dark:text-white text-sm">Instalar no iPhone / iPad</h3>
+                  <span className="text-[11px] text-slate-400 dark:text-slate-500">3 passos rápidos no Safari</span>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowIosInstallModal(false)}
+                className="p-1 rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3 my-4">
+              <div className="flex items-start gap-3 bg-slate-50 dark:bg-slate-800/60 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
+                <div className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
+                  1
+                </div>
+                <div className="text-xs text-slate-700 dark:text-slate-300 leading-snug">
+                  Toque no botão <strong className="text-blue-600 dark:text-blue-400 inline-flex items-center gap-1 mx-1"><Share className="w-3.5 h-3.5 inline" /> Compartilhar</strong> na barra inferior do Safari.
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3 bg-slate-50 dark:bg-slate-800/60 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
+                <div className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
+                  2
+                </div>
+                <div className="text-xs text-slate-700 dark:text-slate-300 leading-snug">
+                  Role o menu e selecione <strong className="text-slate-900 dark:text-white inline-flex items-center gap-1 mx-1"><PlusSquare className="w-3.5 h-3.5 inline" /> Adicionar à Tela de Início</strong>.
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3 bg-slate-50 dark:bg-slate-800/60 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
+                <div className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
+                  3
+                </div>
+                <div className="text-xs text-slate-700 dark:text-slate-300 leading-snug">
+                  Toque em <strong className="text-blue-600 dark:text-blue-400">"Adicionar"</strong> no canto superior direito para finalizar.
+                </div>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setShowIosInstallModal(false)}
+              style={{ backgroundColor: themeColor || '#2563eb' }}
+              className="w-full py-2.5 rounded-xl text-white font-bold text-xs shadow-md hover:opacity-90 transition-opacity cursor-pointer text-center"
+            >
+              Entendi, pronto!
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Bottom Navigation - Mobile */}
       <nav className="md:hidden fixed bottom-0 w-full bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 flex justify-around p-2 z-30 pb-safe">
