@@ -3,9 +3,11 @@ import axios from 'axios';
 import { 
   Calendar, Clock, User, MessageCircle, Edit2, XCircle, Phone, Plus, X, 
   TrendingUp, CheckCircle2, AlertCircle, Sparkles, Search, DollarSign, 
-  Users, ArrowUpRight, Share2, Copy, Check, LayoutGrid, List, CalendarDays
+  Users, ArrowUpRight, Share2, Copy, Check, LayoutGrid, List, CalendarDays,
+  CheckCheck, Zap
 } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
+import { scheduleMorningNotification } from '../lib/pushNotifications';
 
 export default function Dashboard() {
   const [appointments, setAppointments] = useState([]);
@@ -15,11 +17,12 @@ export default function Dashboard() {
   const [currentEditApp, setCurrentEditApp] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [selectedDayFilter, setSelectedDayFilter] = useState('ALL');
   const [copiedLink, setCopiedLink] = useState(false);
 
   // Modo de visualização com persistência em cache (localStorage)
   const [viewMode, setViewMode] = useState(() => {
-    return localStorage.getItem('lypsyos_appointments_view_mode') || 'cards';
+    return localStorage.getItem('lypsyos_appointments_view_mode') || 'timeline';
   });
 
   const handleViewModeChange = (mode) => {
@@ -27,13 +30,8 @@ export default function Dashboard() {
     localStorage.setItem('lypsyos_appointments_view_mode', mode);
   };
 
-  const { businessName, whatsapp, themeColor } = useAppStore();
+  const { businessName, responsibleName, whatsapp, themeColor } = useAppStore();
   const [availableServices, setAvailableServices] = useState([]);
-
-  useEffect(() => {
-    fetchAppointments();
-    fetchServices();
-  }, []);
 
   const fetchServices = () => {
     const token = btoa('admin:admin');
@@ -54,6 +52,19 @@ export default function Dashboard() {
     .then(res => {
       setAppointments(res.data);
       setLoading(false);
+
+      // Agenda notificação matinal proativa caso configurado
+      try {
+        const todayCount = (res.data || []).filter(app => {
+          if (!app.start_time) return false;
+          const d = new Date(app.start_time);
+          const today = new Date();
+          return d.toDateString() === today.toDateString();
+        }).length;
+        scheduleMorningNotification(todayCount, responsibleName || businessName || 'Profissional');
+      } catch (e) {
+        console.warn('Erro ao agendar notificação:', e);
+      }
     })
     .catch(err => {
       console.error("Erro ao buscar agendamentos:", err);
@@ -61,6 +72,11 @@ export default function Dashboard() {
       setLoading(false);
     });
   };
+
+  useEffect(() => {
+    fetchAppointments();
+    fetchServices();
+  }, []);
 
   const formatPhoneNumber = (phone) => {
     if (!phone) return 'Não informado';
@@ -92,6 +108,13 @@ export default function Dashboard() {
             Confirmado
           </span>
         );
+      case 'COMPLETED':
+        return (
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-400 border border-blue-200/80 dark:border-blue-800/60">
+            <CheckCheck className="w-3.5 h-3.5 text-blue-500" />
+            Concluído
+          </span>
+        );
       case 'PENDING':
         return (
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200/80 dark:border-amber-800/60">
@@ -114,6 +137,56 @@ export default function Dashboard() {
           </span>
         );
     }
+  };
+
+  // Alteração Rápida de Status (1 Toque com Atualização Otimista)
+  const handleQuickStatusChange = async (appId, newStatus) => {
+    setAppointments(prev => prev.map(a => a.id === appId ? { ...a, status: newStatus } : a));
+    const token = btoa('admin:admin');
+    try {
+      await axios.patch(`http://localhost:8000/api/v1/appointments/${appId}/`, {
+        status: newStatus
+      }, {
+        headers: { 'Authorization': `Basic ${token}` }
+      });
+    } catch (err) {
+      console.warn('Falha ao atualizar status do agendamento:', err);
+    }
+  };
+
+  // Cálculo de Proximidade e Timing em Tempo Real
+  const getAppointmentTiming = (startTimeStr) => {
+    if (!startTimeStr) return { label: '', color: '' };
+    const start = new Date(startTimeStr);
+    const now = new Date();
+    const diffMs = start.getTime() - now.getTime();
+    const diffMinutes = Math.round(diffMs / 60000);
+
+    if (diffMinutes < -60) {
+      return { label: 'Concluído', color: 'text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800/60', isPast: true };
+    }
+    if (diffMinutes < 0) {
+      return { label: 'Em atendimento agora', color: 'text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 font-bold', isNow: true };
+    }
+    if (diffMinutes <= 30) {
+      return { label: `Começa em ${diffMinutes} min`, color: 'text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-800 font-bold', isSoon: true };
+    }
+    if (diffMinutes <= 120) {
+      return { label: `Daqui a ${Math.round(diffMinutes / 60)}h`, color: 'text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/60' };
+    }
+    return { label: start.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }), color: 'text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800' };
+  };
+
+  // Gerador de Mensagem Humanizada e Link Direto do WhatsApp
+  const getWhatsAppDirectLink = (app) => {
+    const phoneDigits = (app.client?.phone_number || '').replace(/\D/g, '');
+    if (!phoneDigits) return 'https://web.whatsapp.com';
+    const cleanPhone = phoneDigits.startsWith('55') ? phoneDigits : `55${phoneDigits}`;
+    const startDate = new Date(app.start_time);
+    const timeFormatted = startDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    const clientFirstName = (app.client?.full_name || 'Cliente').split(' ')[0];
+    const msg = `Olá, ${clientFirstName}! ✨ Passando para confirmar seu horário de *${app.service?.name || 'atendimento'}* hoje às *${timeFormatted}* no *${businessName || 'nosso espaço'}*. Tudo certo para você?`;
+    return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(msg)}`;
   };
 
   // Criação de Agendamento Manual
@@ -232,17 +305,43 @@ export default function Dashboard() {
   // Ticket Médio Real (ou 0 se não houver agendamentos)
   const ticketMedio = confirmedAll.length > 0 ? (totalFaturamento / confirmedAll.length) : 0;
 
-  // Capacidade do dia (Estimado em 8 slots por profissional)
-  const capacidadePorcentagem = Math.min(100, Math.round((todayAppointments.length / 8) * 100));
+  // Taxa de Capacidade Ocupada do Dia (calculada sobre base média diária de 8 horários)
+  const metaDiariaHorarios = 8;
+  const capacidadePorcentagem = Math.min(100, Math.round((todayAppointments.length / metaDiariaHorarios) * 100));
 
-  // Filtros de busca
+  // Geração Dinâmica de Pílulas de Datas (Hoje, Amanhã e Próximos 7 Dias)
+  const datePills = (() => {
+    const pills = [
+      { id: 'ALL', label: 'Todos os Dias', sub: 'Visão Geral', count: appointments.length }
+    ];
+
+    const today = new Date();
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(today);
+      d.setDate(today.getDate() + i);
+      const iso = d.toISOString().split('T')[0];
+      const count = appointments.filter(a => a.start_time?.startsWith(iso)).length;
+      
+      let label = d.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '');
+      label = label.charAt(0).toUpperCase() + label.slice(1);
+      if (i === 0) label = 'Hoje';
+      if (i === 1) label = 'Amanhã';
+
+      const sub = d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
+      pills.push({ id: iso, label, sub, count, isToday: i === 0 });
+    }
+    return pills;
+  })();
+
+  // Filtros de busca e data
   const filteredAppointments = appointments.filter(app => {
     const matchesSearch = 
       app.client?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       app.client?.phone_number?.includes(searchTerm);
     const matchesStatus = statusFilter === 'ALL' || 
       (statusFilter === 'CANCELLED' ? (app.status === 'CANCELLED' || app.status === 'CANCELED') : app.status === statusFilter);
-    return matchesSearch && matchesStatus;
+    const matchesDay = selectedDayFilter === 'ALL' || app.start_time?.startsWith(selectedDayFilter);
+    return matchesSearch && matchesStatus && matchesDay;
   });
 
   return (
@@ -394,6 +493,52 @@ export default function Dashboard() {
               <span className="text-emerald-600 dark:text-emerald-400 font-semibold">Plano Pro</span>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Carrossel de Datas e Filtro do Dia (One-Thumb Ergonomics) */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between text-xs font-bold text-slate-500 dark:text-slate-400 px-1">
+          <span className="flex items-center gap-1.5 uppercase tracking-wider text-[11px]">
+            <Calendar className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+            Navegação Rápida da Agenda
+          </span>
+          <span className="text-[11px] font-medium text-slate-400 dark:text-slate-500">
+            {selectedDayFilter === 'ALL' ? 'Mostrando todos os dias' : 'Filtrando dia selecionado'}
+          </span>
+        </div>
+
+        <div className="flex items-center gap-2.5 overflow-x-auto pb-1 scrollbar-none -mx-1 px-1">
+          {datePills.map(pill => {
+            const isSelected = selectedDayFilter === pill.id;
+            return (
+              <button
+                key={pill.id}
+                onClick={() => setSelectedDayFilter(pill.id)}
+                className={`flex flex-col items-start px-4 py-2.5 rounded-2xl border text-xs font-semibold shrink-0 transition-all cursor-pointer active:scale-95 shadow-2xs ${
+                  isSelected
+                    ? 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-500/25'
+                    : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200/80 dark:border-slate-800 hover:border-blue-400/60 dark:hover:border-blue-600'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <span className="font-extrabold text-sm">{pill.label}</span>
+                  {pill.count > 0 && (
+                    <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                      isSelected
+                        ? 'bg-white/20 text-white'
+                        : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/60'
+                    }`}>
+                      {pill.count}
+                    </span>
+                  )}
+                </div>
+                <span className={`text-[11px] font-medium mt-0.5 ${isSelected ? 'text-blue-100' : 'text-slate-400 dark:text-slate-500'}`}>
+                  {pill.sub}
+                </span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -626,7 +771,7 @@ export default function Dashboard() {
           </div>
         </div>
       ) : viewMode === 'timeline' ? (
-        /* 2. MODO AGENDA / LINHA DO TEMPO CRONOLÓGICA */
+        /* 2. MODO AGENDA / LINHA DO TEMPO CRONOLÓGICA INTERATIVA (PADRÃO HIGH-END) */
         <div className="space-y-6">
           {Object.entries(
             filteredAppointments.reduce((acc, app) => {
@@ -640,105 +785,210 @@ export default function Dashboard() {
               acc[dateKey].push(app);
               return acc;
             }, {})
-          ).map(([dateLabel, apps]) => (
-            <div key={dateLabel} className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-6 shadow-sm">
-              <div className="flex items-center gap-2 mb-6 pb-3 border-b border-slate-100 dark:border-slate-800">
-                <Calendar className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                <h4 className="font-bold text-slate-900 dark:text-white capitalize text-sm sm:text-base">{dateLabel}</h4>
-                <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 ml-auto border border-slate-200 dark:border-slate-700">
-                  {apps.length} {apps.length === 1 ? 'agendamento' : 'agendamentos'}
-                </span>
-              </div>
+          ).map(([dateLabel, apps]) => {
+            // Ordena cronologicamente os agendamentos do dia
+            const sortedApps = [...apps].sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
+            const isToday = apps.some(a => a.start_time?.startsWith(todayStr));
+            const now = new Date();
+            let liveIndicatorRendered = false;
 
-              <div className="relative pl-6 space-y-5 before:absolute before:left-2.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200 dark:before:bg-slate-800">
-                {apps.map(app => {
-                  const startDate = new Date(app.start_time);
-                  const isCanceled = app.status === 'CANCELLED' || app.status === 'CANCELED';
-                  const phoneDigits = (app.client?.phone_number || '').replace(/\D/g, '');
-                  const waUrl = phoneDigits.length >= 10 && phoneDigits.length <= 13
-                    ? `https://wa.me/${phoneDigits.startsWith('55') ? phoneDigits : '55' + phoneDigits}?text=${encodeURIComponent(`Olá ${app.client?.full_name || ''}! Confirmamos seu agendamento no ${businessName}.`)}`
-                    : `https://web.whatsapp.com`;
+            return (
+              <div key={dateLabel} className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 p-5 md:p-7 shadow-xs">
+                {/* Header do Dia */}
+                <div className="flex flex-wrap items-center justify-between gap-3 mb-6 pb-4 border-b border-slate-100 dark:border-slate-800">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center shadow-2xs">
+                      <Calendar className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h4 className="font-extrabold text-slate-900 dark:text-white capitalize text-base md:text-lg">
+                        {dateLabel}
+                      </h4>
+                      {isToday && (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                          Hoje • Dia Ativo
+                        </span>
+                      )}
+                    </div>
+                  </div>
 
-                  return (
-                    <div key={app.id} className="relative group">
-                      {/* Ponto da Linha do Tempo */}
-                      <span className={`absolute -left-[27px] top-4 w-3.5 h-3.5 rounded-full border-2 bg-white dark:bg-slate-900 transition-all ${
-                        isCanceled 
-                          ? 'border-rose-400 group-hover:bg-rose-500' 
-                          : app.status === 'CONFIRMED'
-                          ? 'border-emerald-500 group-hover:bg-emerald-500'
-                          : 'border-amber-400 group-hover:bg-amber-400'
-                      }`}></span>
+                  <span className="text-xs font-bold px-3 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/70 dark:border-slate-700/80">
+                    {sortedApps.length} {sortedApps.length === 1 ? 'atendimento' : 'atendimentos'}
+                  </span>
+                </div>
 
-                      <div className="bg-slate-50/70 dark:bg-slate-800/40 hover:bg-slate-50 dark:hover:bg-slate-800/70 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-4 transition-all hover:shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
-                        <div className="flex items-start md:items-center gap-4">
-                          <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 px-3 py-2 rounded-xl text-center shrink-0 shadow-2xs">
-                            <span className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase">Horário</span>
-                            <span className="text-base font-extrabold text-slate-900 dark:text-white">
-                              {startDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                {/* Fluxo da Linha do Tempo */}
+                <div className="relative pl-6 space-y-4 before:absolute before:left-2.5 before:top-3 before:bottom-3 before:w-0.5 before:bg-slate-200/80 dark:before:bg-slate-800">
+                  {sortedApps.map((app, appIdx) => {
+                    const startDate = new Date(app.start_time);
+                    const endDate = new Date(startDate.getTime() + ((app.service?.duration_minutes || 30) * 60000));
+                    const isCanceled = app.status === 'CANCELLED' || app.status === 'CANCELED';
+                    const isConfirmed = app.status === 'CONFIRMED';
+                    const isPending = app.status === 'PENDING';
+                    const isCompleted = app.status === 'COMPLETED';
+
+                    const timing = getAppointmentTiming(app.start_time);
+                    const waUrl = getWhatsAppDirectLink(app);
+
+                    // Indicador de "Agora" (se hoje e for o ponto de corte do horário atual)
+                    const shouldRenderLiveNow = isToday && !liveIndicatorRendered && startDate > now;
+                    if (shouldRenderLiveNow) {
+                      liveIndicatorRendered = true;
+                    }
+
+                    return (
+                      <div key={app.id} className="space-y-4">
+                        {/* Linha Divisória de Horário Atual ("Agora") */}
+                        {shouldRenderLiveNow && (
+                          <div className="relative flex items-center gap-3 py-2 -ml-6 pl-6">
+                            <span className="absolute -left-[30px] w-4 h-4 rounded-full bg-rose-500 border-2 border-white dark:border-slate-900 shadow-md flex items-center justify-center">
+                              <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping"></span>
                             </span>
-                          </div>
-
-                          <div>
-                            <div className="flex flex-wrap items-center gap-2">
-                              <h5 className="font-bold text-slate-900 dark:text-white text-sm">{app.service?.name}</h5>
-                              <span className="text-emerald-600 dark:text-emerald-400 font-bold text-xs">
-                                R$ {parseFloat(app.service?.price || 0).toFixed(2).replace('.', ',')}
-                              </span>
-                              {getStatusBadge(app.status)}
+                            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-500 text-white text-[10px] font-extrabold uppercase tracking-wider shadow-sm shadow-rose-500/30">
+                              <Zap className="w-3 h-3 fill-current" />
+                              <span>Agora • {now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
                             </div>
-                            <div className="flex flex-wrap items-center gap-3 mt-1.5 text-xs text-slate-500 dark:text-slate-400">
-                              <span className="flex items-center gap-1 font-semibold text-slate-800 dark:text-slate-200">
-                                <User className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-                                {app.client?.full_name}
-                              </span>
-                              <span className="flex items-center gap-1">
-                                <Phone className="w-3.5 h-3.5 text-slate-400" />
-                                {formatPhoneNumber(app.client?.phone_number || '')}
-                              </span>
-                              <span className="flex items-center gap-1">
-                                <Clock className="w-3.5 h-3.5 text-slate-400" />
-                                {app.service?.duration_minutes || 30} min
-                              </span>
+                            <div className="flex-1 h-[2px] bg-gradient-to-r from-rose-500 via-rose-300 dark:via-rose-900 to-transparent"></div>
+                          </div>
+                        )}
+
+                        <div className="relative group">
+                          {/* Marcador de Ponto na Linha */}
+                          <span className={`absolute -left-[27px] top-4 w-3.5 h-3.5 rounded-full border-2 bg-white dark:bg-slate-900 transition-all ${
+                            isCanceled 
+                              ? 'border-rose-400 group-hover:bg-rose-500' 
+                              : isCompleted
+                              ? 'border-blue-500 group-hover:bg-blue-500'
+                              : isConfirmed
+                              ? 'border-emerald-500 group-hover:bg-emerald-500'
+                              : 'border-amber-400 group-hover:bg-amber-400'
+                          }`}></span>
+
+                          {/* Microcard Interativo */}
+                          <div className={`bg-slate-50/70 dark:bg-slate-800/40 hover:bg-white dark:hover:bg-slate-800 border rounded-2xl p-4 transition-all duration-200 hover:shadow-md flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-l-4 ${
+                            isCanceled
+                              ? 'border-slate-200 dark:border-slate-750 border-l-rose-400 opacity-60'
+                              : isCompleted
+                              ? 'border-slate-200 dark:border-slate-700 border-l-blue-500'
+                              : isConfirmed
+                              ? 'border-slate-200 dark:border-slate-700 border-l-emerald-500'
+                              : 'border-slate-200 dark:border-slate-700 border-l-amber-500'
+                          }`}>
+                            <div className="flex items-start sm:items-center gap-4">
+                              {/* Bloco de Horário */}
+                              <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 px-3 py-2.5 rounded-xl text-center shrink-0 shadow-2xs min-w-[72px]">
+                                <span className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Início</span>
+                                <span className="text-base font-black text-slate-900 dark:text-white">
+                                  {startDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                                <span className="block text-[10px] font-semibold text-slate-400 mt-0.5">
+                                  até {endDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                              </div>
+
+                              {/* Detalhes do Serviço & Cliente */}
+                              <div className="space-y-1.5 overflow-hidden">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <h5 className="font-bold text-slate-900 dark:text-white text-sm md:text-base leading-tight">
+                                    {app.service?.name || "Serviço"}
+                                  </h5>
+                                  <span className="text-emerald-600 dark:text-emerald-400 font-extrabold text-xs">
+                                    R$ {parseFloat(app.service?.price || 0).toFixed(2).replace('.', ',')}
+                                  </span>
+                                  {getStatusBadge(app.status)}
+                                  {timing.label && (
+                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${timing.color}`}>
+                                      {timing.label}
+                                    </span>
+                                  )}
+                                </div>
+
+                                <div className="flex flex-wrap items-center gap-y-1 gap-x-3 text-xs text-slate-500 dark:text-slate-400">
+                                  <span className="flex items-center gap-1.5 font-bold text-slate-800 dark:text-slate-200">
+                                    <div className="w-5 h-5 rounded-full bg-blue-100 dark:bg-blue-950/80 text-blue-700 dark:text-blue-300 flex items-center justify-center text-[10px] font-black">
+                                      {app.client?.full_name ? app.client.full_name[0].toUpperCase() : 'C'}
+                                    </div>
+                                    {app.client?.full_name}
+                                  </span>
+                                  <span className="flex items-center gap-1">
+                                    <Phone className="w-3.5 h-3.5 text-slate-400" />
+                                    {formatPhoneNumber(app.client?.phone_number || '')}
+                                  </span>
+                                  <span className="flex items-center gap-1">
+                                    <Clock className="w-3.5 h-3.5 text-slate-400" />
+                                    {app.service?.duration_minutes || 30} min
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Botões de Ações Rápidas com 1 Toque (Ergonomia Máxima) */}
+                            <div className="flex items-center gap-2 self-end lg:self-center shrink-0 flex-wrap">
+                              {/* 1-Tap Quick Action de Status */}
+                              {isPending && (
+                                <button
+                                  onClick={() => handleQuickStatusChange(app.id, 'CONFIRMED')}
+                                  title="Confirmar Agendamento com 1 Toque"
+                                  className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3 py-2 rounded-xl shadow-xs transition-all active:scale-95 cursor-pointer"
+                                >
+                                  <Check className="w-3.5 h-3.5" />
+                                  <span>Confirmar</span>
+                                </button>
+                              )}
+
+                              {isConfirmed && (
+                                <button
+                                  onClick={() => handleQuickStatusChange(app.id, 'COMPLETED')}
+                                  title="Marcar como Atendido / Concluído"
+                                  className="inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-3 py-2 rounded-xl shadow-xs transition-all active:scale-95 cursor-pointer"
+                                >
+                                  <CheckCheck className="w-3.5 h-3.5" />
+                                  <span>Concluir</span>
+                                </button>
+                              )}
+
+                              {/* WhatsApp Direct */}
+                              <a
+                                href={waUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                title="Abrir conversa no WhatsApp com mensagem de confirmação"
+                                className="inline-flex items-center gap-1.5 bg-[#25D366] hover:bg-[#20bd5a] text-white px-3 py-2 rounded-xl text-xs font-bold shadow-xs transition-all active:scale-95"
+                              >
+                                <MessageCircle className="w-3.5 h-3.5 fill-current" />
+                                <span className="hidden sm:inline">WhatsApp</span>
+                              </a>
+
+                              {/* Editar Agendamento */}
+                              <button
+                                onClick={() => handleEditAppointment(app)}
+                                className="p-2 text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-white dark:hover:bg-slate-700 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 cursor-pointer shadow-2xs transition-all active:scale-95"
+                                title="Editar Agendamento"
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </button>
+
+                              {/* Cancelar Agendamento */}
+                              {!isCanceled && (
+                                <button
+                                  onClick={() => handleCancelAppointment(app.id)}
+                                  className="p-2 text-slate-600 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-white dark:hover:bg-slate-700 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 cursor-pointer shadow-2xs active:scale-95 transition-all"
+                                  title="Cancelar Agendamento"
+                                >
+                                  <XCircle className="w-3.5 h-3.5" />
+                                </button>
+                              )}
                             </div>
                           </div>
-                        </div>
-
-                        {/* Botões de Ação na Linha do Tempo */}
-                        <div className="flex items-center gap-2 self-end md:self-center">
-                          <a
-                            href={waUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 bg-[#25D366] hover:bg-[#20bd5a] text-white px-3 py-1.5 rounded-xl text-xs font-semibold shadow-xs"
-                          >
-                            <MessageCircle className="w-3.5 h-3.5 fill-current" />
-                            WhatsApp
-                          </a>
-                          <button
-                            onClick={() => handleEditAppointment(app)}
-                            className="p-1.5 text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-white dark:hover:bg-slate-700 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 cursor-pointer shadow-2xs"
-                            title="Editar Agendamento"
-                          >
-                            <Edit2 className="w-3.5 h-3.5" />
-                          </button>
-                          {!isCanceled && (
-                            <button
-                              onClick={() => handleCancelAppointment(app.id)}
-                              className="p-1.5 text-slate-600 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-white dark:hover:bg-slate-700 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 cursor-pointer shadow-2xs active:scale-95"
-                              title="Cancelar Agendamento"
-                            >
-                              <XCircle className="w-3.5 h-3.5" />
-                            </button>
-                          )}
                         </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       ) : (
         /* 3. MODO CARTÕES (PADRÃO ATUAL) */

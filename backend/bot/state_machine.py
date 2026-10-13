@@ -161,10 +161,11 @@ class BotStateMachine:
     def handle_awaiting_service(self, msg):
         service_map = self.state_record.context_data.get('service_map', {})
         
-        # Normalização flexível (independente de maiúsculas, minúsculas, pontuação ou prefixos)
+        # Normalização flexível (independente de maiúsculas, minúsculas, pontuação, barras ou prefixos)
         clean_msg = msg.strip().lower()
-        clean_normalized = clean_msg.replace('.', '').replace('-', '').replace(')', '').strip()
+        clean_normalized = clean_msg.replace('.', '').replace('-', '').replace(')', '').replace('\\', '').replace('/', '').strip()
         clean_letter = clean_normalized.replace('opcao', '').replace('opção', '').replace('letra', '').strip()
+        clean_alpha = re.sub(r'[^a-zA-Z0-9]', '', clean_msg)
 
         matched_service_id = None
         if clean_msg in service_map:
@@ -173,12 +174,47 @@ class BotStateMachine:
             matched_service_id = service_map[clean_normalized]
         elif clean_letter in service_map:
             matched_service_id = service_map[clean_letter]
+        elif clean_alpha in service_map:
+            matched_service_id = service_map[clean_alpha]
+        elif clean_alpha and clean_alpha[0] in service_map:
+            matched_service_id = service_map[clean_alpha[0]]
 
         if not matched_service_id:
             trigger_exit = self.config.trigger_exit or '0'
-            return f"Opção inválida. Por favor, digite a letra do procedimento desejado (ex: *A*) ou *{trigger_exit}* para voltar."
+            return (
+                f"⚠️ Opção não reconhecida.\n\n"
+                f"Por favor, digite a letra do procedimento desejado (ex: *A*) ou digite *{trigger_exit}* para voltar ao menu inicial."
+            )
+
+        # Monta mapa de próximas datas para Mensagens de Lista e Quick Replies
+        today = datetime.date.today()
+        weekday_names = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo']
+        date_list_map = {}
+        date_list_lines = []
+
+        for i in range(7):
+            d = today + datetime.timedelta(days=i)
+            iso = d.strftime('%Y-%m-%d')
+            d_fmt = d.strftime('%d/%m')
+            w_name = weekday_names[d.weekday()]
+            idx_str = str(i + 1)
+
+            date_list_map[idx_str] = iso
+            date_list_map[d_fmt] = iso
+            if i == 0:
+                date_list_map['hoje'] = iso
+                date_list_map['btn_hoje'] = iso
+            elif i == 1:
+                date_list_map['amanha'] = iso
+                date_list_map['amanhã'] = iso
+                date_list_map['btn_amanha'] = iso
+            
+            label = "Hoje" if i == 0 else "Amanhã" if i == 1 else f"{w_name}, {d_fmt}"
+            date_list_lines.append(f"*{idx_str}* - {label}")
 
         self.state_record.context_data['selected_service_id'] = matched_service_id
+        self.state_record.context_data['date_list_map'] = date_list_map
+        self.state_record.context_data['date_list_lines'] = date_list_lines
         self.update_state('AWAITING_DATE', self.state_record.context_data)
 
         try:
@@ -187,7 +223,17 @@ class BotStateMachine:
         except:
             svc_name = "seu procedimento"
 
-        return f"Excelente escolha para *{svc_name}*! Para qual *data* você gostaria de agendar? (Ex: Hoje, Amanhã, 15/10)"
+        trigger_exit = self.config.trigger_exit or '0'
+        return (
+            f"Excelente escolha para *{svc_name}*! ✨\n\n"
+            f"📅 *Para qual data gostaria de agendar?*\n\n"
+            f"👉 Escolha uma opção rápida:\n"
+            f"• Digite *Hoje*\n"
+            f"• Digite *Amanhã*\n"
+            f"• Digite *Outra* (para ver lista de dias disponíveis)\n"
+            f"• Ou envie no formato *DD/MM* (ex: 15/10)\n\n"
+            f"Qual data você prefere? (ou digite *{trigger_exit}* para voltar):"
+        )
 
     def get_available_slots(self, target_date, service_duration_minutes=30):
         """
@@ -330,13 +376,31 @@ class BotStateMachine:
     def handle_awaiting_date(self, msg):
         today = datetime.date.today()
         target_date = None
+        clean_msg = msg.strip().lower()
+        date_list_map = self.state_record.context_data.get('date_list_map', {})
+        date_list_lines = self.state_record.context_data.get('date_list_lines', [])
 
-        if 'hoje' in msg:
+        # 1. Solicitação de Mensagem de Lista (Outra Data)
+        if clean_msg in ['outra data', 'outra', 'outras', 'btn_outra_data', 'lista', 'ver datas', 'outros dias']:
+            lines_str = "\n".join(date_list_lines) if date_list_lines else "• Digite a data no formato DD/MM (ex: 15/10)"
+            return (
+                f"🗓️ *Próximas datas disponíveis para agendamento:*\n\n"
+                f"{lines_str}\n\n"
+                f"Digite o *número* da data desejada (ex: *1*, *2*) ou envie a data no formato *DD/MM* (ex: 15/10):"
+            )
+
+        # 2. Respostas Rápidas (Hoje / Amanhã)
+        if clean_msg in ['hoje', 'btn_hoje']:
             target_date = today
-        elif 'amanh' in msg:
+        elif clean_msg in ['amanha', 'amanhã', 'btn_amanha']:
             target_date = today + datetime.timedelta(days=1)
+        # 3. Seleção por número da lista (1, 2, 3...)
+        elif clean_msg in date_list_map:
+            iso_selected = date_list_map[clean_msg]
+            target_date = datetime.datetime.strptime(iso_selected, "%Y-%m-%d").date()
         else:
-            match = re.search(r'(\d{1,2})/(\d{1,2})', msg)
+            # 4. Formato de Data Livre DD/MM ou DD/MM/AAAA
+            match = re.search(r'(\d{1,2})/(\d{1,2})', clean_msg)
             if match:
                 day, month = int(match.group(1)), int(match.group(2))
                 try:
@@ -344,9 +408,21 @@ class BotStateMachine:
                     if target_date < today:
                         target_date = datetime.date(today.year + 1, month, day)
                 except ValueError:
-                    return "Data inválida. Tente no formato DD/MM (ex: 15/10)."
+                    trigger_exit = self.config.trigger_exit or '0'
+                    return (
+                        f"⚠️ Data inválida (dia ou mês inexistente).\n\n"
+                        f"Por favor, tente novamente enviando uma data válida (ex: *15/10*) ou responda com *Hoje* ou *Amanhã* (ou *{trigger_exit}* para voltar):"
+                    )
             else:
-                return "Não consegui entender a data. Diga *hoje*, *amanhã* ou *DD/MM* (ex: 15/10)."
+                trigger_exit = self.config.trigger_exit or '0'
+                return (
+                    f"⚠️ Não consegui entender a data informada.\n\n"
+                    f"Por favor, tente novamente escolhendo uma das opções:\n"
+                    f"• Responda com *Hoje* ou *Amanhã*\n"
+                    f"• Digite *Outra* para ver os próximos dias disponíveis\n"
+                    f"• Ou envie no formato *DD/MM* (ex: 15/10)\n\n"
+                    f"Para qual data gostaria de agendar? (ou digite *{trigger_exit}* para voltar):"
+                )
 
         date_str = target_date.strftime('%Y-%m-%d')
         service_id = self.state_record.context_data.get('selected_service_id')

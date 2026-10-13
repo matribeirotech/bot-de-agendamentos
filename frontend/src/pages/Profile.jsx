@@ -126,13 +126,13 @@ export default function Profile() {
       }
     });
 
-    // Se o email local estiver vazio, busca da sessão autenticada do Supabase
+    // Se o email local estiver vazio, busca do usuário autenticado no Supabase
     if (isSupabaseConfigured()) {
-      supabase.auth.getSession().then(({ data: { session } }) => {
-        if (session?.user?.email) {
+      supabase.auth.getUser().then(({ data: { user } }) => {
+        if (user?.email) {
           setFormData(prev => ({
             ...prev,
-            email: prev.email || session.user.email
+            email: prev.email || user.email
           }));
         }
       });
@@ -261,9 +261,9 @@ export default function Profile() {
         email: (formData.email || email || '').trim(),
       };
       if (!dataToSave.email && isSupabaseConfigured()) {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.user?.email) {
-          dataToSave.email = session.user.email;
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user?.email) {
+          dataToSave.email = user.email;
         }
       }
 
