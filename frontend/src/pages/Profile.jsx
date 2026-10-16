@@ -5,6 +5,7 @@ import { useAppStore } from '../store/useAppStore';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { evaluatePasswordStrength, generateStrongPassword, BotDefense } from '../lib/security';
 import { SEGMENTS } from '../lib/segmentSeeds';
+import { SegmentIconBadge } from '../components/ui/SegmentServiceIcon';
 import { 
   User, Lock, Mail, Phone, Camera, Sparkles, ShieldCheck, 
   KeyRound, Copy, Check, Palette, Building2, QrCode, LogOut, 
@@ -14,7 +15,7 @@ import {
 } from 'lucide-react';
 
 const THEME_PRESETS = [
-  { name: 'Azul Lypsyos', hex: '#2563eb', bg: 'bg-blue-600' },
+  { name: 'Azul Lypsyos', hex: '#2457f5', bg: 'bg-[#2457f5]' },
   { name: 'Roxo Royal', hex: '#7c3aed', bg: 'bg-purple-600' },
   { name: 'Rosa Quartz', hex: '#db2777', bg: 'bg-pink-600' },
   { name: 'Esmeralda', hex: '#059669', bg: 'bg-emerald-600' },
@@ -642,36 +643,56 @@ export default function Profile() {
                 </div>
               </div>
 
-              {/* SELEÇÃO DO SEGMENTO COM SINCRONIZAÇÃO AUTOMÁTICA DOS SERVIÇOS */}
-              <div className="md:col-span-2 bg-blue-50/50 dark:bg-blue-950/30 p-4 rounded-2xl border border-blue-100/80 dark:border-blue-900/60">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
-                  <label className="block text-xs font-bold uppercase tracking-wider text-blue-900 dark:text-blue-300">
+              {/* SELEÇÃO DO SEGMENTO COM ÍCONES NEURAIS & SINCRONIZAÇÃO AUTOMÁTICA */}
+              <div className="md:col-span-2 bg-brand-soft/40 dark:bg-blue-950/30 p-4 rounded-2xl border border-blue-100/80 dark:border-blue-900/60 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-brand dark:text-blue-300">
                     Segmento de Atuação
                   </label>
                   {isSyncingSegment && (
-                    <span className="text-[11px] font-bold text-blue-600 dark:text-blue-400 flex items-center gap-1">
+                    <span className="text-[11px] font-bold text-brand dark:text-blue-400 flex items-center gap-1">
                       <RefreshCw className="w-3 h-3 animate-spin" /> Atualizando catálogo de serviços...
                     </span>
                   )}
                 </div>
-                
-                <select
-                  name="segment"
-                  value={formData.segment}
-                  onChange={handleInputChange}
-                  className="w-full px-3.5 py-2.5 text-sm border border-blue-200 dark:border-blue-800 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 bg-white dark:bg-slate-800 transition-all font-semibold text-slate-800 dark:text-white"
-                >
-                  {SEGMENTS.map(seg => (
-                    <option key={seg.id} value={seg.id}>
-                      {seg.icon} {seg.title}
-                    </option>
-                  ))}
-                </select>
 
-                <div className="mt-2.5 flex items-start gap-2 text-xs text-blue-700 dark:text-blue-300 bg-white/80 dark:bg-slate-850 p-2.5 rounded-xl border border-blue-100 dark:border-blue-900">
-                  <Sparkles className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                  {SEGMENTS.map(seg => {
+                    const isSelected = formData.segment === seg.id;
+                    return (
+                      <button
+                        key={seg.id}
+                        type="button"
+                        onClick={() => handleInputChange({ target: { name: 'segment', value: seg.id } })}
+                        className={`group text-left p-3 rounded-xl border transition-all flex items-center gap-3 cursor-pointer min-w-0 ${
+                          isSelected
+                            ? 'bg-white dark:bg-slate-800 border-brand ring-2 ring-brand/20 shadow-sm'
+                            : 'bg-white/70 dark:bg-slate-800/50 border-slate-200/80 dark:border-slate-700 hover:bg-white dark:hover:bg-slate-800 hover:border-brand/40'
+                        }`}
+                      >
+                        <SegmentIconBadge segmentId={seg.id} size="sm" />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-1">
+                            <p className="font-heading text-xs font-bold text-ink dark:text-white truncate">
+                              {seg.title}
+                            </p>
+                            {isSelected && (
+                              <span className="w-2 h-2 rounded-full bg-growth shrink-0 animate-pulse" />
+                            )}
+                          </div>
+                          <p className="text-[10px] text-ink-muted dark:text-slate-400 truncate mt-0.5">
+                            {seg.description}
+                          </p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="flex items-start gap-2 text-xs text-brand dark:text-blue-300 bg-white/90 dark:bg-slate-850 p-2.5 rounded-xl border border-blue-100 dark:border-blue-900">
+                  <Sparkles className="w-4 h-4 text-brand dark:text-blue-400 shrink-0 mt-0.5" />
                   <span>
-                    <strong>Atualização Automática:</strong> Ao mudar para <strong>{selectedSegmentObj.title}</strong>, os serviços da aba <em>Serviços</em> são substituídos pelos procedimentos padrão desta área (ex: {selectedSegmentObj.defaultServices.map(s => s.name).slice(0, 2).join(', ')}...).
+                    <strong>Atualização Automática:</strong> Ao selecionar <strong>{selectedSegmentObj.title}</strong>, os serviços da aba <em>Serviços</em> são atualizados com os procedimentos padrão desta área (ex: {selectedSegmentObj.defaultServices.map(s => s.name).slice(0, 2).join(', ')}...).
                   </span>
                 </div>
               </div>

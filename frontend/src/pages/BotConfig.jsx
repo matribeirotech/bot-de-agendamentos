@@ -8,6 +8,8 @@ import {
 } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { SEGMENTS } from '../lib/segmentSeeds';
+import { LypsyosIconBadge } from '../components/ui/LypsyosIconBadge';
+import { Button } from '../components/ui/Button';
 
 export default function BotConfig() {
   const { businessName, setBusinessName, segment, themeColor, avatarUrl } = useAppStore();
@@ -468,37 +470,42 @@ export default function BotConfig() {
         </div>
       )}
 
-      {/* Header Estilo Landing Page Lypsyos */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-2 border-b border-slate-200/60 dark:border-slate-800">
-        <div>
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-950/50 border border-blue-100 dark:border-blue-900/60 text-blue-700 dark:text-blue-300 text-xs font-semibold tracking-wide uppercase mb-3">
-            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: themeColor || '#2563eb' }}></span>
+      {/* Header Estilo Landing Page Lypsyos / Zenda */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-2 border-b border-line dark:border-slate-800">
+        <div className="min-w-0">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-soft dark:bg-blue-950/50 border border-blue-100 dark:border-blue-900/60 text-brand dark:text-blue-300 text-xs font-semibold tracking-wide uppercase mb-3">
+            <span className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: themeColor || '#2457f5' }}></span>
             Automação WhatsApp & URA Numérica
           </div>
-          <h1 className="text-3xl md:text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight leading-tight">
-            Meu <span className="text-emerald-500">Robô Atendente</span>
-          </h1>
-          <p className="text-slate-600 dark:text-slate-400 mt-2 text-sm md:text-base max-w-2xl">
+          <div className="flex items-center gap-3.5">
+            <LypsyosIconBadge icon={Bot} tone="growth" size="md" />
+            <h1 className="font-heading text-2xl sm:text-3xl md:text-4xl font-extrabold text-ink dark:text-white tracking-tight leading-tight break-words">
+              Meu <span className="text-growth">Robô Atendente</span>
+            </h1>
+          </div>
+          <p className="text-ink-soft dark:text-slate-400 mt-2 text-sm md:text-base max-w-2xl break-words">
             Configure o fluxo de auto-saudação, atalhos numéricos da URA e regras inteligentes de agendamento automático 24h.
           </p>
         </div>
 
-        <button 
+        <Button 
           onClick={handleSave}
           disabled={saving}
-          style={{ backgroundColor: themeColor || '#2563eb' }}
-          className="inline-flex items-center justify-center gap-2.5 text-white font-semibold text-sm px-6 py-3.5 rounded-xl shadow-lg shadow-blue-500/25 active:scale-[0.98] transition-all whitespace-nowrap self-start md:self-auto cursor-pointer disabled:opacity-70 hover:opacity-90"
+          variant="primary"
+          size="lg"
+          style={{ backgroundColor: themeColor || '#2457f5' }}
+          className="w-full sm:w-auto self-start md:self-auto"
         >
-          {saving ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
-          {saving ? 'Sincronizando...' : 'Salvar Alterações'}
-        </button>
+          {saving ? <RefreshCw className="w-5 h-5 animate-spin shrink-0" /> : <Save className="w-5 h-5 shrink-0" />}
+          <span>{saving ? 'Sincronizando...' : 'Salvar Alterações'}</span>
+        </Button>
       </div>
 
       {/* Navegação por Abas (Step-by-step UX) */}
-      <div className="flex items-center gap-2 bg-white dark:bg-slate-900 p-1.5 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-x-auto">
+      <div className="flex items-center gap-2 bg-surface dark:bg-slate-900 p-1.5 rounded-2xl border border-line dark:border-slate-800 shadow-soft overflow-x-auto">
         <button
           onClick={() => setActiveTab('messages')}
-          style={activeTab === 'messages' ? { backgroundColor: themeColor || '#2563eb' } : {}}
+          style={activeTab === 'messages' ? { backgroundColor: themeColor || '#2457f5' } : {}}
           className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap ${
             activeTab === 'messages'
               ? 'text-white shadow-md shadow-blue-500/20'
@@ -510,7 +517,7 @@ export default function BotConfig() {
         </button>
         <button
           onClick={() => setActiveTab('hours')}
-          style={activeTab === 'hours' ? { backgroundColor: themeColor || '#2563eb' } : {}}
+          style={activeTab === 'hours' ? { backgroundColor: themeColor || '#2457f5' } : {}}
           className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap ${
             activeTab === 'hours'
               ? 'text-white shadow-md shadow-blue-500/20'
@@ -522,7 +529,7 @@ export default function BotConfig() {
         </button>
         <button
           onClick={() => setActiveTab('triggers')}
-          style={activeTab === 'triggers' ? { backgroundColor: themeColor || '#2563eb' } : {}}
+          style={activeTab === 'triggers' ? { backgroundColor: themeColor || '#2457f5' } : {}}
           className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap ${
             activeTab === 'triggers'
               ? 'text-white shadow-md shadow-blue-500/20'
@@ -537,21 +544,21 @@ export default function BotConfig() {
       {/* Conteúdo das Abas e Simulador */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Painel Principal */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="min-w-0 lg:col-span-2 space-y-6">
 
           {/* ABA 1: MENSAGENS E ATALHOS (NOVA URA INTELIGENTE) */}
           {activeTab === 'messages' && (
             <div className="space-y-6">
               {/* Card de Configuração dos Gatilhos Numéricos */}
-              <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 p-6 shadow-sm space-y-6">
+              <div className="bg-surface dark:bg-slate-900 rounded-3xl border border-line dark:border-slate-800 p-6 shadow-soft space-y-6">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100 dark:border-slate-800">
-                  <div>
-                    <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-100 dark:border-emerald-800/60 text-emerald-700 dark:text-emerald-400 text-[11px] font-bold uppercase tracking-wide mb-1">
-                      <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                  <div className="min-w-0">
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-growth-soft dark:bg-emerald-950/60 border border-emerald-100 dark:border-emerald-800/60 text-growth-text dark:text-emerald-400 text-[11px] font-bold uppercase tracking-wide mb-1">
+                      <Sparkles className="w-3.5 h-3.5 text-growth" />
                       Menu Numérico URA
                     </div>
-                    <h3 className="text-lg font-bold text-slate-900 dark:text-white">Atalhos do Menu WhatsApp</h3>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    <h3 className="font-heading text-lg font-bold text-ink dark:text-white break-words">Atalhos do Menu WhatsApp</h3>
+                    <p className="text-xs text-ink-soft dark:text-slate-400 mt-0.5 break-words">
                       Substitua comandos complicados como <span className="font-mono text-slate-700 dark:text-slate-300">#agendar</span> por dígitos diretos no teclado.
                     </p>
                   </div>
@@ -943,7 +950,7 @@ export default function BotConfig() {
         </div>
 
         {/* Simulador ao Vivo em Chassi de Smartphone Real (Design Instagram / Meta Standard) */}
-        <div className="w-full lg:w-[380px] shrink-0">
+        <div className="min-w-0 w-full lg:w-[380px] shrink-0">
           <div className="sticky top-6">
             
             {/* Título & Botão de Recomeçar */}

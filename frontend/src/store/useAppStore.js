@@ -35,7 +35,7 @@ const initialState = {
   avatarUrl: '',
   pixKey: '',
   pixType: 'TELEFONE', // 'CPF' | 'CNPJ' | 'EMAIL' | 'TELEFONE' | 'ALEATORIA'
-  themeColor: '#2563eb', // Azul padrão Lypsyos
+  themeColor: '#2457f5', // Azul padrão Lypsyos
   themeMode: 'light', // 'light' | 'dark' | 'custom'
   bio: '',
 
@@ -58,7 +58,7 @@ export const useAppStore = create(
       // Gerenciamento de Tema (Dark, Light, Custom)
       setThemeMode: (mode) => {
         set({ themeMode: mode });
-        const color = get().themeColor || '#2563eb';
+        const color = get().themeColor || '#2457f5';
         applyTheme(mode, color);
       },
 
@@ -229,7 +229,7 @@ export const useAppStore = create(
             }
           } catch (e) {}
 
-          applyTheme(merged.themeMode || 'light', merged.themeColor || '#2563eb');
+          applyTheme(merged.themeMode || 'light', merged.themeColor || '#2457f5');
         }
 
         return loaded;
@@ -263,7 +263,7 @@ export const useAppStore = create(
             const phone = (formData.whatsapp ?? merged.whatsapp ?? '').trim();
             const salon = (formData.businessName ?? merged.businessName ?? '').trim();
             const currentMode = formData.themeMode || merged.themeMode || 'light';
-            const currentColor = formData.themeColor || merged.themeColor || '#2563eb';
+            const currentColor = formData.themeColor || merged.themeColor || '#2457f5';
 
             // Metadados do Supabase Auth (seguros para evitar limite de tamanho)
             const safeAvatarForMeta = (formData.avatarUrl && !formData.avatarUrl.startsWith('data:'))
@@ -355,7 +355,7 @@ export const useAppStore = create(
         }
 
         // 4. Aplica tema ativo
-        applyTheme(formData.themeMode || state.themeMode || 'light', formData.themeColor || state.themeColor || '#2563eb');
+        applyTheme(formData.themeMode || state.themeMode || 'light', formData.themeColor || state.themeColor || '#2457f5');
       },
 
       // Logout Seguro (Preserva as configurações do perfil no navegador e apenas encerra a sessão ativa)
@@ -396,7 +396,7 @@ export const useAppStore = create(
       name: 'lypsyos-store',
       onRehydrateStorage: () => (state) => {
         if (state) {
-          applyTheme(state.themeMode || 'light', state.themeColor || '#2563eb');
+          applyTheme(state.themeMode || 'light', state.themeColor || '#2457f5');
         }
       },
       merge: (persistedState, currentState) => ({

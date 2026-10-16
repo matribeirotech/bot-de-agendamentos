@@ -8,6 +8,9 @@ import {
 } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { scheduleMorningNotification } from '../lib/pushNotifications';
+import { LypsyosIconBadge } from '../components/ui/LypsyosIconBadge';
+import { Button } from '../components/ui/Button';
+import { ServiceIconBadge } from '../components/ui/SegmentServiceIcon';
 
 export default function Dashboard() {
   const [appointments, setAppointments] = useState([]);
@@ -30,7 +33,7 @@ export default function Dashboard() {
     localStorage.setItem('lypsyos_appointments_view_mode', mode);
   };
 
-  const { businessName, responsibleName, whatsapp, themeColor } = useAppStore();
+  const { businessName, responsibleName, whatsapp, themeColor, segment } = useAppStore();
   const [availableServices, setAvailableServices] = useState([]);
 
   const fetchServices = () => {
@@ -345,77 +348,86 @@ export default function Dashboard() {
   });
 
   return (
-    <div className="space-y-8">
-      {/* Header com foco no estabelecimento */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-2 border-b border-slate-200/60 dark:border-slate-800">
-        <div>
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-950/50 border border-blue-100 dark:border-blue-900/60 text-blue-700 dark:text-blue-300 text-xs font-semibold tracking-wide uppercase mb-3">
-            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: themeColor || '#2563eb' }}></span>
-            Painel Operacional • {businessName}
+    <div className="space-y-8 min-w-0">
+      {/* Header com foco no estabelecimento e tipografia Poppins (font-heading) */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-2 border-b border-line dark:border-slate-800 min-w-0">
+        <div className="min-w-0">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-soft dark:bg-blue-950/50 border border-brand/20 dark:border-blue-900/60 text-brand dark:text-blue-300 text-xs font-semibold tracking-wide uppercase mb-3">
+            <span className="w-2 h-2 rounded-full bg-growth animate-pulse"></span>
+            Zenda CRM • {businessName}
           </div>
 
-          <h1 className="text-3xl md:text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight leading-tight">
-            Gestão simples para <span className="text-emerald-500 underline decoration-emerald-200 dark:decoration-emerald-800 underline-offset-4">{businessName}</span>
+          <h1 className="font-heading text-2xl sm:text-3xl md:text-4xl font-extrabold text-ink dark:text-white tracking-tight leading-tight break-words">
+            Gestão inteligente para <span className="text-brand dark:text-blue-400 underline decoration-brand/30 underline-offset-4">{businessName}</span>
           </h1>
-          <p className="text-slate-600 dark:text-slate-400 mt-2 text-sm md:text-base max-w-2xl">
-            Acompanhe horários em tempo real e deixe o robô do WhatsApp preencher a sua agenda automaticamente.
+          <p className="text-ink-soft dark:text-slate-400 mt-2 text-sm md:text-base max-w-2xl">
+            Acompanhe horários em tempo real e deixe o robô do WhatsApp preencher a sua agenda automaticamente 24/7.
           </p>
         </div>
 
-        {/* Botões de Ação do Topo */}
+        {/* Botões de Ação do Topo (Responsivos sem truncamento no mobile) */}
         <div className="flex items-center gap-3 self-start md:self-auto flex-wrap">
-          <button
+          <Button
+            variant="outline"
             onClick={handleCopyBotLink}
-            className="inline-flex items-center gap-2 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 font-semibold text-xs px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs transition-all cursor-pointer"
             title="Compartilhar link de agendamento automático com clientes"
           >
-            {copiedLink ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4 text-blue-600 dark:text-blue-400" />}
+            {copiedLink ? <Check className="w-4 h-4 text-growth" /> : <Copy className="w-4 h-4 text-brand dark:text-blue-400" />}
             <span>{copiedLink ? "Link Copiado!" : "Copiar Link do Robô"}</span>
-          </button>
+          </Button>
 
-          <button 
+          <Button 
+            variant="default"
             onClick={() => setIsModalOpen(true)}
-            style={{ backgroundColor: themeColor || '#2563eb' }}
-            className="inline-flex items-center justify-center gap-2 text-white font-semibold text-xs px-5 py-3 rounded-xl shadow-lg shadow-blue-500/25 active:scale-[0.98] transition-all cursor-pointer hover:opacity-90"
+            style={themeColor ? { backgroundColor: themeColor } : {}}
           >
             <Plus className="w-4 h-4" />
-            Novo Agendamento
-          </button>
+            <span>Novo Agendamento</span>
+          </Button>
         </div>
       </div>
 
-      {/* Grid de Métricas 100% DINÂMICAS E ZERADAS PARA NOVOS USUÁRIOS */}
+      {/* Grid de Métricas 100% DINÂMICAS COM DESIGN SYSTEM LYPSYOS / ZENDA */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Card 1: Faturamento do Dia */}
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-6 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden">
-          <div className="flex items-center justify-between mb-4">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Faturamento Previsto</span>
-            <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full border ${
+        {/* Card 1: Faturamento Previsto */}
+        <div className="min-w-0 bg-surface dark:bg-slate-900 rounded-3xl border border-line dark:border-slate-800 p-5 sm:p-6 shadow-[var(--shadow-soft)] hover:shadow-[var(--shadow-lift)] transition-all relative overflow-hidden">
+          <div className="flex items-center justify-between gap-3 mb-4">
+            <div className="flex items-center gap-3 min-w-0">
+              <LypsyosIconBadge icon={TrendingUp} tone="growth" size="md" />
+              <div className="min-w-0">
+                <span className="text-xs font-bold uppercase tracking-wider text-ink-soft dark:text-slate-400 block truncate">
+                  Faturamento Previsto
+                </span>
+                <span className="text-[11px] text-ink-muted dark:text-slate-500 block truncate">
+                  Receita confirmada na agenda
+                </span>
+              </div>
+            </div>
+            <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full border shrink-0 ${
               totalFaturamento > 0 
-                ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 border-emerald-100 dark:border-emerald-800' 
-                : 'text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700'
+                ? 'text-growth-text dark:text-emerald-400 bg-growth-soft dark:bg-emerald-950/60 border-growth/25 dark:border-emerald-800' 
+                : 'text-ink-muted dark:text-slate-500 bg-canvas dark:bg-slate-800/60 border-line dark:border-slate-700'
             }`}>
-              <TrendingUp className="w-3.5 h-3.5" />
-              {totalFaturamento > 0 ? '+100% real' : 'Sem agendamentos'}
+              {totalFaturamento > 0 ? '+100% real' : 'Zerado'}
             </span>
           </div>
 
-          <div className="text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+          <div className="font-heading text-3xl font-extrabold text-growth-text dark:text-emerald-400 tracking-tight">
             R$ {totalFaturamento.toFixed(2).replace('.', ',')}
           </div>
 
-          <div className="grid grid-cols-3 gap-2 mt-6 pt-4 border-t border-slate-100 dark:border-slate-800 text-xs">
-            <div className="bg-slate-50 dark:bg-slate-800/60 p-2.5 rounded-xl">
-              <p className="text-slate-500 dark:text-slate-400 font-medium text-[11px]">Ticket médio</p>
-              <p className="font-bold text-slate-900 dark:text-white mt-0.5">R$ {ticketMedio.toFixed(2).replace('.', ',')}</p>
+          <div className="grid grid-cols-3 gap-2 mt-6 pt-4 border-t border-line/70 dark:border-slate-800 text-xs">
+            <div className="bg-canvas dark:bg-slate-800/60 p-2.5 rounded-xl min-w-0">
+              <p className="text-ink-soft dark:text-slate-400 font-medium text-[11px] truncate">Ticket médio</p>
+              <p className="font-heading font-bold text-ink dark:text-white mt-0.5 truncate">R$ {ticketMedio.toFixed(2).replace('.', ',')}</p>
             </div>
-            <div className="bg-slate-50 dark:bg-slate-800/60 p-2.5 rounded-xl">
-              <p className="text-slate-500 dark:text-slate-400 font-medium text-[11px]">Atendidos</p>
-              <p className="font-bold text-slate-900 dark:text-white mt-0.5">{confirmedAll.length}</p>
+            <div className="bg-canvas dark:bg-slate-800/60 p-2.5 rounded-xl min-w-0">
+              <p className="text-ink-soft dark:text-slate-400 font-medium text-[11px] truncate">Atendidos</p>
+              <p className="font-heading font-bold text-ink dark:text-white mt-0.5">{confirmedAll.length}</p>
             </div>
-            <div className="bg-slate-50 dark:bg-slate-800/60 p-2.5 rounded-xl">
-              <p className="text-slate-500 dark:text-slate-400 font-medium text-[11px]">Capacidade</p>
-              <p className={`font-bold mt-0.5 ${capacidadePorcentagem > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400 dark:text-slate-500'}`}>
+            <div className="bg-canvas dark:bg-slate-800/60 p-2.5 rounded-xl min-w-0">
+              <p className="text-ink-soft dark:text-slate-400 font-medium text-[11px] truncate">Capacidade</p>
+              <p className={`font-heading font-bold mt-0.5 ${capacidadePorcentagem > 0 ? 'text-growth-text dark:text-emerald-400' : 'text-ink-muted dark:text-slate-500'}`}>
                 {capacidadePorcentagem}%
               </p>
             </div>
@@ -423,75 +435,82 @@ export default function Dashboard() {
         </div>
 
         {/* Card 2: Resumo do Caixa DINÂMICO */}
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-6 shadow-sm hover:shadow-md transition-shadow relative">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Resumo do Caixa</span>
-            <div className="flex items-center gap-3 text-xs font-semibold">
-              <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
-                <span className="w-2 h-2 rounded-full bg-emerald-500"></span> Entradas
-              </span>
-              <span className="flex items-center gap-1 text-blue-600 dark:text-blue-400">
-                <span className="w-2 h-2 rounded-full bg-blue-600"></span> A Receber
-              </span>
+        <div className="min-w-0 bg-surface dark:bg-slate-900 rounded-3xl border border-line dark:border-slate-800 p-5 sm:p-6 shadow-[var(--shadow-soft)] hover:shadow-[var(--shadow-lift)] transition-all relative flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between gap-2 mb-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <LypsyosIconBadge icon={DollarSign} tone="brand" size="md" />
+                <span className="text-xs font-bold uppercase tracking-wider text-ink-soft dark:text-slate-400 truncate">
+                  Resumo do Caixa
+                </span>
+              </div>
+              <div className="flex items-center gap-2.5 text-[11px] font-semibold shrink-0">
+                <span className="flex items-center gap-1 text-growth-text dark:text-emerald-400">
+                  <span className="w-2 h-2 rounded-full bg-growth"></span> Entradas
+                </span>
+                <span className="flex items-center gap-1 text-brand dark:text-blue-400">
+                  <span className="w-2 h-2 rounded-full bg-brand"></span> A Receber
+                </span>
+              </div>
+            </div>
+
+            <div className="space-y-2 mt-3">
+              <div className="flex justify-between items-center bg-growth-soft/70 dark:bg-emerald-950/40 border border-growth/20 dark:border-emerald-800/60 px-3 py-2 rounded-xl text-xs">
+                <span className="font-medium text-growth-text dark:text-emerald-300">↗ Entradas de Hoje</span>
+                <span className="font-heading font-bold text-growth-text dark:text-emerald-400">R$ {entradasHoje.toFixed(2).replace('.', ',')}</span>
+              </div>
+              <div className="flex justify-between items-center bg-brand-soft/70 dark:bg-blue-950/40 border border-brand/20 dark:border-blue-900/60 px-3 py-2 rounded-xl text-xs">
+                <span className="font-medium text-brand dark:text-blue-300">→ A Receber (Pendentes)</span>
+                <span className="font-heading font-bold text-brand dark:text-blue-400">R$ {aReceberHoje.toFixed(2).replace('.', ',')}</span>
+              </div>
             </div>
           </div>
 
-          <div className="space-y-2 mt-4">
-            <div className="flex justify-between items-center bg-emerald-50/70 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-800/60 px-3 py-2 rounded-xl text-xs">
-              <span className="font-medium text-emerald-800 dark:text-emerald-300">↗ Entradas de Hoje</span>
-              <span className="font-bold text-emerald-700 dark:text-emerald-400">R$ {entradasHoje.toFixed(2).replace('.', ',')}</span>
-            </div>
-            <div className="flex justify-between items-center bg-blue-50/70 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-900/60 px-3 py-2 rounded-xl text-xs">
-              <span className="font-medium text-blue-800 dark:text-blue-300">→ A Receber (Pendentes)</span>
-              <span className="font-bold text-blue-700 dark:text-blue-400">R$ {aReceberHoje.toFixed(2).replace('.', ',')}</span>
-            </div>
-          </div>
-
-          <div className="mt-4 bg-slate-950 dark:bg-slate-800/80 text-white rounded-xl p-3.5 flex items-center justify-between shadow-md border border-slate-800 dark:border-slate-700">
+          <div className="mt-4 bg-night text-white rounded-2xl p-3.5 flex items-center justify-between shadow-md border border-white/10">
             <div>
-              <p className="text-[11px] text-slate-400 font-medium">Saldo do dia</p>
-              <p className="text-lg font-bold text-white tracking-tight">R$ {saldoDia.toFixed(2).replace('.', ',')}</p>
+              <p className="text-[11px] text-white/60 font-medium">Saldo confirmado hoje</p>
+              <p className="font-heading text-lg font-extrabold text-growth tracking-tight">R$ {saldoDia.toFixed(2).replace('.', ',')}</p>
             </div>
-            <div className="flex items-center gap-1 text-emerald-400 text-xs font-semibold">
+            <div className="flex items-center gap-1 text-cyan-300 text-xs font-semibold">
               <Sparkles className="w-4 h-4" />
               {todayAppointments.length > 0 ? `${todayAppointments.length} agendados hoje` : 'Dia livre'}
             </div>
           </div>
         </div>
 
-        {/* Card 3: Automação WhatsApp & Eficiência */}
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-6 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Robô WhatsApp</span>
-              <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2.5 py-1 rounded-full border border-emerald-200 dark:border-emerald-800">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                Online 24h
-              </span>
+        {/* Card 3: Card Executivo Zenda Platform (Padrão Seção 6 do Guia Oficial) */}
+        <div className="min-w-0 rounded-3xl border border-line dark:border-slate-800 bg-night p-5 sm:p-6 text-white shadow-2xl flex flex-col justify-between space-y-4">
+          {/* Header com Ícone Oficial Zenda e Status */}
+          <div className="flex items-center justify-between gap-2 border-b border-white/10 pb-4">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-white p-1 shadow-md border border-white/20">
+                <img src="/logo-lypsyos-zenda-r1.svg" alt="Zenda Platform" className="size-full object-contain" />
+              </div>
+              <div className="min-w-0">
+                <p className="font-heading font-bold text-white text-base leading-tight truncate">Zenda Platform</p>
+                <p className="text-xs text-white/60 truncate">Sistema de Agendamento</p>
+              </div>
             </div>
-            <div className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
-              3s tempo de resposta
-            </div>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-              Clientes que enviam mensagem no WhatsApp ou digitam <strong>#agendar</strong> recebem atendimento imediato.
-            </p>
+            <span className="rounded-full bg-growth-soft px-3 py-1 text-xs font-semibold text-growth-text shrink-0 flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-growth animate-pulse"></span>
+              Robô Ativo 24/7
+            </span>
           </div>
 
-          <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 space-y-2 text-xs">
-            <div className="flex items-center justify-between text-slate-600 dark:text-slate-400">
-              <span className="flex items-center gap-1.5">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-                Agendamentos automáticos
-              </span>
-              <span className="font-bold text-slate-900 dark:text-white">{appointments.length > 0 ? 'Ativo' : 'Aguardando'}</span>
+          {/* Bloco Interno de Destaque */}
+          <div className="rounded-2xl bg-white/5 border border-white/10 p-4 space-y-1">
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-white/60">Faturamento previsto hoje</p>
+              <span className="text-[11px] font-bold text-cyan-300">⚡ 3s resposta</span>
             </div>
-            <div className="flex items-center justify-between text-slate-600 dark:text-slate-400">
-              <span className="flex items-center gap-1.5">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-                Lembretes automáticos
-              </span>
-              <span className="text-emerald-600 dark:text-emerald-400 font-semibold">Plano Pro</span>
-            </div>
+            <p className="font-heading text-2xl sm:text-3xl font-extrabold text-growth">
+              R$ {(entradasHoje + aReceberHoje).toFixed(2).replace('.', ',')}
+            </p>
+            <p className="text-xs text-white/70">
+              {todayAppointments.length > 0
+                ? `${todayAppointments.length} cliente(s) agendada(s) pelo robô hoje`
+                : 'Aguardando novos agendamentos via #agendar'}
+            </p>
           </div>
         </div>
       </div>
@@ -640,38 +659,42 @@ export default function Dashboard() {
         </div>
       ) : filteredAppointments.length === 0 ? (
         /* EMPTY STATE ELEGANTE E COM CTAs AMIGÁVEIS */
-        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 p-12 md:p-16 text-center flex flex-col items-center justify-center shadow-sm">
-          <div className="w-16 h-16 rounded-2xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center mb-4 shadow-xs">
-            <Calendar className="w-8 h-8" />
+        <div className="bg-surface dark:bg-slate-900 rounded-3xl border border-line dark:border-slate-800 p-10 md:p-16 text-center flex flex-col items-center justify-center shadow-soft">
+          <div className="mb-4">
+            <LypsyosIconBadge icon={Calendar} tone="brand" size="xl" />
           </div>
           
-          <h3 className="text-xl font-bold text-slate-900 dark:text-white">Nenhum agendamento registrado ainda</h3>
-          <p className="text-slate-500 dark:text-slate-400 mt-1 max-w-md text-xs sm:text-sm leading-relaxed">
+          <h3 className="font-heading text-xl font-bold text-ink dark:text-white break-words">Nenhum agendamento registrado ainda</h3>
+          <p className="text-ink-soft dark:text-slate-400 mt-1 max-w-md text-xs sm:text-sm leading-relaxed break-words">
             Sua agenda está limpa e pronta para começar! Compartilhe o link do seu robô no WhatsApp com suas clientes ou faça um cadastro manual.
           </p>
 
-          <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-            <button 
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-3 w-full">
+            <Button 
               onClick={handleCopyBotLink}
-              className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs px-5 py-3 rounded-xl transition-all shadow-md shadow-emerald-500/20 cursor-pointer"
+              variant="whatsapp"
+              size="md"
+              className="w-full sm:w-auto"
             >
-              <Share2 className="w-4 h-4" />
-              {copiedLink ? "Link Copiado!" : "Copiar Link do Robô (#agendar)"}
-            </button>
+              <Share2 className="w-4 h-4 shrink-0" />
+              <span>{copiedLink ? "Link Copiado!" : "Copiar Link do Robô (#agendar)"}</span>
+            </Button>
 
-            <button 
+            <Button 
               onClick={() => setIsModalOpen(true)}
-              style={{ backgroundColor: themeColor || '#2563eb' }}
-              className="inline-flex items-center gap-2 text-white font-semibold text-xs px-5 py-3 rounded-xl transition-all shadow-md shadow-blue-500/20 cursor-pointer hover:opacity-90"
+              variant="primary"
+              size="md"
+              style={{ backgroundColor: themeColor || '#2457f5' }}
+              className="w-full sm:w-auto"
             >
-              <Plus className="w-4 h-4" />
-              Novo Agendamento Manual
-            </button>
+              <Plus className="w-4 h-4 shrink-0" />
+              <span>Novo Agendamento Manual</span>
+            </Button>
           </div>
         </div>
       ) : viewMode === 'table' ? (
         /* 1. MODO TABELA PROFISSIONAL */
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-hidden">
+        <div className="bg-surface dark:bg-slate-900 rounded-2xl border border-line dark:border-slate-800 shadow-soft overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
@@ -710,11 +733,16 @@ export default function Dashboard() {
                         </div>
                       </td>
                       <td className="py-3.5 px-4">
-                        <p className="font-semibold text-slate-900 dark:text-white">{app.service?.name || "Serviço"}</p>
-                        <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1 mt-0.5">
-                          <Clock className="w-3 h-3 text-slate-400" />
-                          {app.service?.duration_minutes || 30} min
-                        </p>
+                        <div className="flex items-center gap-2.5">
+                          <ServiceIconBadge serviceName={app.service?.name} segmentId={segment} size="xs" />
+                          <div>
+                            <p className="font-semibold text-slate-900 dark:text-white leading-tight">{app.service?.name || "Serviço"}</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1 mt-0.5">
+                              <Clock className="w-3 h-3 text-slate-400" />
+                              {app.service?.duration_minutes || 30} min
+                            </p>
+                          </div>
+                        </div>
                       </td>
                       <td className="py-3.5 px-4">
                         <div className="text-xs">
@@ -793,20 +821,18 @@ export default function Dashboard() {
             let liveIndicatorRendered = false;
 
             return (
-              <div key={dateLabel} className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 p-5 md:p-7 shadow-xs">
+              <div key={dateLabel} className="bg-surface dark:bg-slate-900 rounded-3xl border border-line dark:border-slate-800 p-5 md:p-7 shadow-soft">
                 {/* Header do Dia */}
                 <div className="flex flex-wrap items-center justify-between gap-3 mb-6 pb-4 border-b border-slate-100 dark:border-slate-800">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center shadow-2xs">
-                      <Calendar className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <h4 className="font-extrabold text-slate-900 dark:text-white capitalize text-base md:text-lg">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <LypsyosIconBadge icon={Calendar} tone="brand" size="sm" />
+                    <div className="min-w-0">
+                      <h4 className="font-heading font-extrabold text-ink dark:text-white capitalize text-base md:text-lg break-words">
                         {dateLabel}
                       </h4>
                       {isToday && (
-                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-growth-text dark:text-emerald-400">
+                          <span className="w-1.5 h-1.5 rounded-full bg-growth animate-pulse"></span>
                           Hoje • Dia Ativo
                         </span>
                       )}
@@ -886,6 +912,9 @@ export default function Dashboard() {
                                   até {endDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                                 </span>
                               </div>
+
+                              {/* Ícone Neural do Procedimento */}
+                              <ServiceIconBadge serviceName={app.service?.name} segmentId={segment} size="sm" className="hidden sm:inline-flex" />
 
                               {/* Detalhes do Serviço & Cliente */}
                               <div className="space-y-1.5 overflow-hidden">

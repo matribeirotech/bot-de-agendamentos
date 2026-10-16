@@ -1,27 +1,27 @@
 {
-  "name": "Lypsyos - Gestão & Agendamentos Inteligentes",
-  "short_name": "Lypsyos",
-  "description": "Sistema de gestão inteligente com automação de agendamentos no WhatsApp, catálogo interativo e CRM para profissionais de beleza.",
+  "name": "Zenda by Lypsyos — Gestão & Agendamentos Inteligentes",
+  "short_name": "Zenda",
+  "description": "Sistema de gestão inteligente com automação de agendamentos no WhatsApp, catálogo interativo e CRM para profissionais.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "display_override": ["standalone", "window-controls-overlay"],
-  "background_color": "#0f172a",
-  "theme_color": "#2563eb",
+  "background_color": "#0b1f4d",
+  "theme_color": "#2457f5",
   "orientation": "portrait-primary",
   "lang": "pt-BR",
   "categories": ["business", "productivity", "utilities"],
   "icons": [
     {
-      "src": "/favicon.svg",
-      "sizes": "192x192",
+      "src": "/logo-lypsyos-zenda-r1.svg",
+      "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any"
     },
     {
-      "src": "/favicon.svg",
+      "src": "/logo-lypsyos-zenda-r1.jpg",
       "sizes": "512x512",
-      "type": "image/svg+xml",
+      "type": "image/jpeg",
       "purpose": "any maskable"
     }
   ],
