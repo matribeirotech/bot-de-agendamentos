@@ -122,40 +122,47 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] flex flex-col justify-center py-12 sm:px-6 lg:px-8 font-['Plus_Jakarta_Sans',sans-serif]">
+    <div className="min-h-screen bg-canvas flex flex-col justify-center py-12 sm:px-6 lg:px-8 font-sans">
       {/* Container Centralizado */}
-      <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
-        {/* Logo Oficial Lypsyos */}
-        <Link to="/" className="inline-flex items-center gap-3 group mb-4">
-          <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/25 group-hover:scale-105 transition-transform">
-            <svg className="w-6 h-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/>
-              <line x1="8.2" y1="13.2" x2="15.8" y2="17.8"/><line x1="8.2" y1="10.8" x2="15.8" y2="6.2"/>
-            </svg>
+      <div className="sm:mx-auto sm:w-full sm:max-w-md text-center px-4">
+        {/* Logo Oficial Zenda by Lypsyos */}
+        <Link to="/" className="inline-flex items-center gap-3.5 group mb-4">
+          <img
+            src="/logo-lypsyos-zenda-r1.svg"
+            alt="Zenda"
+            className="w-13 h-13 rounded-2xl object-contain bg-surface p-1 shadow-md border border-line group-hover:scale-105 transition-transform"
+          />
+          <div className="text-left">
+            <span className="font-heading text-3xl font-extrabold tracking-tight text-ink block leading-none">
+              Zenda
+            </span>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-brand mt-0.5 flex items-center gap-1">
+              <img src="/logo-oficial.png" alt="Lypsyos" className="w-3.5 h-3.5 object-contain inline" />
+              Powered by Lypsyos
+            </span>
           </div>
-          <span className="text-3xl font-extrabold tracking-tight text-slate-900">Lypsyos</span>
         </Link>
 
         {/* Badge de Trial */}
         <div>
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200">
-            <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-growth-soft text-growth-text border border-emerald-200">
+            <Sparkles className="w-3.5 h-3.5 text-growth" />
             30 Dias de Teste Grátis no Plano Pro
           </span>
         </div>
 
-        <h2 className="mt-4 text-2xl font-bold tracking-tight text-slate-900">
+        <h2 className="mt-4 font-heading text-2xl font-bold tracking-tight text-ink break-words">
           {isSignUp ? "Crie sua conta profissional" : "Acesse seu painel de gestão"}
         </h2>
-        <p className="mt-1 text-sm text-slate-500">
+        <p className="mt-1 text-sm text-ink-soft break-words">
           {isSignUp 
-            ? "Configure seu robô de manicure em menos de 2 minutos" 
+            ? "Configure seu robô de atendimento em menos de 2 minutos" 
             : "Gerencie seus horários, robô e clientes no WhatsApp"}
         </p>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-lg px-4">
-        <div className="bg-white py-8 px-6 sm:px-10 shadow-xl shadow-slate-200/50 rounded-3xl border border-slate-200/80">
+        <div className="bg-surface py-8 px-6 sm:px-10 shadow-soft rounded-3xl border border-line">
           {/* Alerta de Configuração Inicial do Supabase */}
           {!isSupabaseConfigured() && (
             <div className="mb-6 p-4 rounded-2xl bg-amber-50 border border-amber-200/80 text-amber-900 text-xs">

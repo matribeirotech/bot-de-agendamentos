@@ -1,3 +1,54 @@
 @import "tailwindcss";
 
 @variant dark (&:where(.dark, .dark *));
+
+@theme {
+  /* Fontes (Google Fonts: Inter e Poppins) */
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-heading: "Poppins", "Inter", ui-sans-serif, system-ui, sans-serif;
+
+  /* Cores Principais Lypsyos / Zenda */
+  --color-brand: #2457f5;          /* Azul Principal / CTAs */
+  --color-brand-hover: #1a44d1;    /* Hover de botões */
+  --color-brand-soft: #eaf0ff;     /* Fundo sutil de destaque */
+
+  /* Cores de Crescimento / Sucesso / Faturamento */
+  --color-growth: #10b981;         /* Verde Esmeralda (ícones, status ativo) */
+  --color-growth-text: #047857;    /* Texto verde de alto contraste */
+  --color-growth-soft: #e7f8f1;    /* Fundo de badges de sucesso */
+
+  /* Ciano Tecnológico */
+  --color-cyan-glow: #06b6d4;      /* Nós neurais e linhas orbitais */
+
+  /* Neutros e Fundos */
+  --color-night: #0b1f4d;          /* Azul Noturno corporativo */
+  --color-ink: #0f172a;            /* Texto principal de alto contraste */
+  --color-ink-soft: #475569;       /* Texto secundário e parágrafos */
+  --color-ink-muted: #94a3b8;      /* Legendas, bordas e datas */
+  --color-line: #e2e8f0;           /* Bordas suaves */
+  --color-canvas: #f7f9fc;         /* Fundo de páginas e áreas secundárias */
+  --color-surface: #ffffff;        /* Fundo de cards e modais */
+
+  /* Alertas e Apoio */
+  --color-danger: #ef4444;
+  --color-danger-soft: #fee2e2;
+  --color-warning: #f59e0b;
+  --color-warning-soft: #fef3c7;
+
+  /* Geometria e Raios de Borda */
+  --radius-card: 1rem;             /* 16px para cards principais */
+  --radius-btn: 0.75rem;           /* 12px para botões */
+
+  /* Sombras em Camadas (Soft Shadows) */
+  --shadow-soft: 0 10px 30px rgb(36 87 245 / 0.08);
+  --shadow-lift: 0 1px 2px rgb(15 23 42 / 0.06), 0 18px 40px rgb(36 87 245 / 0.12);
+}
+
+/* Utilitários auxiliares para barra de rolagem limpa e responsividade */
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
