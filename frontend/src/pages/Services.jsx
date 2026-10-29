@@ -1,13 +1,23 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { 
-  Sparkles, Plus, Clock, DollarSign, Check, X, Edit3, 
-  Trash2, Tag, CheckCircle2, RefreshCw, Scissors, Store 
+import {
+  Plus,
+  Clock,
+  X,
+  Edit3,
+  Trash2,
+  CheckCircle2,
+  RefreshCw,
+  ChevronDown,
+  AlertCircle,
 } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { SEGMENTS } from '../lib/segmentSeeds';
-import { SegmentIconBadge, ServiceIconBadge, ServiceCategoryPill } from '../components/ui/SegmentServiceIcon';
-import { LypsyosIconBadge } from '../components/ui/LypsyosIconBadge';
+import {
+  SegmentIconBadge,
+  ServiceIconBadge,
+  ServiceCategoryPill,
+} from '../components/ui/SegmentServiceIcon';
 import { Button } from '../components/ui/Button';
 
 export default function Services() {
@@ -15,335 +25,374 @@ export default function Services() {
   const [loading, setLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingService, setEditingService] = useState(null);
+  const [showSegmentPicker, setShowSegmentPicker] = useState(false);
+  const [confirmSyncSeg, setConfirmSyncSeg] = useState(null);
   const [statusMessage, setStatusMessage] = useState({ type: '', text: '' });
 
-  const { segment, setSegment, saveUserProfile, businessName, themeColor } = useAppStore();
-  const segmentObj = SEGMENTS.find(s => s.id === segment) || SEGMENTS[0];
+  const { segment, setSegment, saveUserProfile, themeColor } = useAppStore();
+  const safeSegment = segment || 'manicure';
+  const segmentObj = SEGMENTS.find((s) => s.id === safeSegment) || SEGMENTS[0];
+
+  const showToast = (type, text) => {
+    setStatusMessage({ type, text });
+    setTimeout(() => setStatusMessage({ type: '', text: '' }), 3500);
+  };
 
   useEffect(() => {
     fetchServices();
-  }, [segment]);
+  }, [safeSegment]);
 
   const fetchServices = () => {
     const token = btoa('admin:admin');
-    axios.get('http://localhost:8000/api/v1/services/', {
-      headers: { 'Authorization': `Basic ${token}` }
-    })
-    .then(res => {
-      setServices(res.data);
-      setLoading(false);
-    })
-    .catch(err => {
-      console.error("Erro ao carregar serviços:", err);
-      setLoading(false);
-    });
+    axios
+      .get('http://localhost:8000/api/v1/services/', {
+        headers: { Authorization: `Basic ${token}` },
+      })
+      .then((res) => {
+        setServices(Array.isArray(res.data) ? res.data : []);
+        setLoading(false);
+      })
+      .catch(() => {
+        setLoading(false);
+      });
   };
 
-  // Sincronizar / Redefinir serviços com os padrões do segmento
-  const handleSyncSegment = async (targetSegmentId = segment) => {
+  const executeSyncSegment = async (targetSegmentId) => {
+    setConfirmSyncSeg(null);
+    setShowSegmentPicker(false);
     setIsSyncing(true);
     const token = btoa('admin:admin');
-    const chosenSegObj = SEGMENTS.find(s => s.id === targetSegmentId) || segmentObj;
+    const chosenSegObj = SEGMENTS.find((s) => s.id === targetSegmentId) || segmentObj;
+
     try {
-      if (targetSegmentId !== segment) {
+      if (targetSegmentId !== safeSegment) {
         setSegment(targetSegmentId);
         saveUserProfile({ segment: targetSegmentId });
       }
-      const res = await axios.post('http://localhost:8000/api/v1/services/change_segment/', {
-        segment: targetSegmentId
-      }, {
-        headers: { 'Authorization': `Basic ${token}` }
-      });
-      setServices(res.data.services);
-      setStatusMessage({ 
-        type: 'success', 
-        text: `Procedimentos sincronizados com o segmento "${chosenSegObj.title}"!` 
-      });
-      setTimeout(() => setStatusMessage({ type: '', text: '' }), 4000);
-    } catch (err) {
-      console.error("Erro ao sincronizar segmento:", err);
-      setStatusMessage({ type: 'error', text: 'Falha ao sincronizar serviços com o nicho.' });
-      setTimeout(() => setStatusMessage({ type: '', text: '' }), 4000);
+      const res = await axios.post(
+        'http://localhost:8000/api/v1/services/change_segment/',
+        { segment: targetSegmentId },
+        { headers: { Authorization: `Basic ${token}` } }
+      );
+      setServices(res.data.services || []);
+      showToast('success', `Cardápio de "${chosenSegObj.title}" carregado!`);
+    } catch {
+      showToast('error', 'Não foi possível carregar os serviços padrão agora.');
     } finally {
       setIsSyncing(false);
     }
   };
 
-  const handleCreateService = (e) => {
+  const openCreateModal = () => {
+    setEditingService(null);
+    setIsModalOpen(true);
+  };
+
+  const openEditModal = (svc) => {
+    setEditingService(svc);
+    setIsModalOpen(true);
+  };
+
+  const handleSaveService = (e) => {
     e.preventDefault();
     const formData = new FormData(e.target);
     const payload = {
       name: formData.get('name'),
-      duration_minutes: parseInt(formData.get('duration_minutes')),
+      duration_minutes: parseInt(formData.get('duration_minutes'), 10),
       price: parseFloat(formData.get('price')),
-      is_active: true
+      is_active: editingService ? editingService.is_active : true,
     };
 
     const token = btoa('admin:admin');
-    axios.post('http://localhost:8000/api/v1/services/', payload, {
-      headers: { 'Authorization': `Basic ${token}` }
-    })
-    .then(res => {
-      setServices(prev => [...prev, res.data]);
-      setIsModalOpen(false);
-      setStatusMessage({ type: 'success', text: 'Serviço cadastrado com sucesso!' });
-      setTimeout(() => setStatusMessage({ type: '', text: '' }), 3000);
-    })
-    .catch(err => {
-      console.error("Erro ao criar serviço:", err);
-      alert("Erro ao cadastrar serviço.");
-    });
+
+    if (editingService) {
+      axios
+        .patch(`http://localhost:8000/api/v1/services/${editingService.id}/`, payload, {
+          headers: { Authorization: `Basic ${token}` },
+        })
+        .then((res) => {
+          setServices((prev) =>
+            prev.map((s) => (s.id === editingService.id ? res.data : s))
+          );
+          setIsModalOpen(false);
+          setEditingService(null);
+          showToast('success', 'Procedimento atualizado!');
+        })
+        .catch(() => {
+          showToast('error', 'Não foi possível salvar a edição.');
+        });
+    } else {
+      axios
+        .post('http://localhost:8000/api/v1/services/', payload, {
+          headers: { Authorization: `Basic ${token}` },
+        })
+        .then((res) => {
+          setServices((prev) => [...prev, res.data]);
+          setIsModalOpen(false);
+          showToast('success', 'Novo procedimento adicionado!');
+        })
+        .catch(() => {
+          showToast('error', 'Não foi possível cadastrar o procedimento.');
+        });
+    }
   };
 
   const toggleServiceStatus = (service) => {
     const token = btoa('admin:admin');
-    axios.patch(`http://localhost:8000/api/v1/services/${service.id}/`, {
-      is_active: !service.is_active
-    }, {
-      headers: { 'Authorization': `Basic ${token}` }
-    })
-    .then(res => {
-      setServices(prev => prev.map(s => s.id === service.id ? res.data : s));
-    })
-    .catch(err => console.error(err));
+    axios
+      .patch(
+        `http://localhost:8000/api/v1/services/${service.id}/`,
+        { is_active: !service.is_active },
+        { headers: { Authorization: `Basic ${token}` } }
+      )
+      .then((res) => {
+        setServices((prev) =>
+          prev.map((s) => (s.id === service.id ? res.data : s))
+        );
+      })
+      .catch(() => {});
   };
 
   const handleDeleteService = async (serviceId) => {
-    if (!confirm("Deseja realmente remover este procedimento?")) return;
+    if (!window.confirm('Deseja remover este procedimento do seu cardápio?')) return;
     const token = btoa('admin:admin');
     try {
       await axios.delete(`http://localhost:8000/api/v1/services/${serviceId}/`, {
-        headers: { 'Authorization': `Basic ${token}` }
+        headers: { Authorization: `Basic ${token}` },
       });
-      setServices(prev => prev.filter(s => s.id !== serviceId));
-      setStatusMessage({ type: 'success', text: 'Procedimento excluído.' });
-      setTimeout(() => setStatusMessage({ type: '', text: '' }), 3000);
+      setServices((prev) => prev.filter((s) => s.id !== serviceId));
+      showToast('success', 'Procedimento removido.');
     } catch {
-      // Se tiver agendamentos atrelados, desativa para preservar integridade
       toggleServiceStatus({ id: serviceId, is_active: true });
+      showToast('success', 'Procedimento pausado (possui agendamentos anteriores).');
     }
   };
 
-  // Separa serviços ativos dos inativos
-  const activeServices = services.filter(s => s.is_active);
-  const inactiveServices = services.filter(s => !s.is_active);
+  const activeServices = services.filter((s) => s.is_active);
+  const inactiveServices = services.filter((s) => !s.is_active);
 
   return (
-    <div className="space-y-8">
-      {/* Header Estilo Landing Page Lypsyos / Zenda */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-2 border-b border-line dark:border-slate-800">
-        <div className="min-w-0">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-soft dark:bg-blue-950/50 border border-blue-100 dark:border-blue-900/60 text-brand dark:text-blue-300 text-xs font-semibold tracking-wide uppercase mb-3">
-            <span className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: themeColor || '#2457f5' }}></span>
-            Catálogo de Serviços • {businessName}
-          </div>
-          <div className="flex items-center gap-3.5">
-            <SegmentIconBadge segmentId={segment} size="md" />
-            <h1 className="font-heading text-2xl sm:text-3xl md:text-4xl font-extrabold text-ink dark:text-white tracking-tight leading-tight break-words">
-              Seus Procedimentos & <span className="text-growth">Valores</span>
-            </h1>
-          </div>
-          <p className="text-ink-soft dark:text-slate-400 mt-2 text-sm md:text-base max-w-2xl break-words">
-            Configure o cardápio de serviços que o robô do WhatsApp oferece automaticamente para os seus clientes.
-          </p>
-        </div>
-
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 self-start md:self-auto w-full sm:w-auto">
-          {/* Botão de Sincronizar Procedimentos do Nicho */}
-          <Button
-            onClick={() => handleSyncSegment(segment)}
-            disabled={isSyncing}
-            variant="outline"
-            size="md"
-            className="w-full sm:w-auto"
-            title="Atualiza os serviços padrão para o segmento configurado no seu perfil"
-          >
-            <RefreshCw className={`w-4 h-4 text-brand dark:text-blue-400 shrink-0 ${isSyncing ? 'animate-spin' : ''}`} />
-            <span>{isSyncing ? "Sincronizando..." : `Sincronizar ${segmentObj.title.split('&')[0]}`}</span>
-          </Button>
-
-          <Button 
-            onClick={() => setIsModalOpen(true)}
-            variant="primary"
-            size="md"
-            style={{ backgroundColor: themeColor || '#2457f5' }}
-            className="w-full sm:w-auto"
-          >
-            <Plus className="w-5 h-5 shrink-0" />
-            <span>Novo Procedimento</span>
-          </Button>
-        </div>
-      </div>
-
-      {/* Seletor Visual de Segmento com Ícones Neurais Proprietários */}
-      <div className="bg-surface dark:bg-slate-900 border border-line dark:border-slate-800 rounded-3xl p-5 shadow-soft space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <h2 className="font-heading text-sm font-bold text-ink dark:text-white flex items-center gap-2">
-              <span>Nicho Ativo:</span>
-              <span className="text-brand dark:text-blue-400">{segmentObj.title}</span>
-            </h2>
-            <p className="text-xs text-ink-soft dark:text-slate-400 mt-0.5">
-              Toque em um segmento abaixo para carregar automaticamente o catálogo ideal para o seu espaço:
-            </p>
-          </div>
-          <span className="bg-growth-soft dark:bg-emerald-950/60 text-growth-text dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 px-3 py-1 rounded-full text-xs font-bold">
-            {activeServices.length} serviços ativos no robô
-          </span>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-          {SEGMENTS.map((seg) => {
-            const isSelected = seg.id === segment;
-            return (
-              <button
-                key={seg.id}
-                type="button"
-                disabled={isSyncing}
-                onClick={() => handleSyncSegment(seg.id)}
-                className={`group text-left p-3.5 rounded-2xl border transition-all duration-200 flex items-center gap-3 cursor-pointer min-w-0 ${
-                  isSelected
-                    ? 'border-brand bg-brand-soft/60 dark:bg-blue-950/40 dark:border-blue-500 shadow-sm ring-2 ring-brand/15'
-                    : 'border-line dark:border-slate-800 bg-canvas/60 dark:bg-slate-800/40 hover:border-brand/40 hover:bg-white dark:hover:bg-slate-800'
-                }`}
-              >
-                <SegmentIconBadge segmentId={seg.id} size="sm" />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between gap-1">
-                    <p className="font-heading text-xs font-bold text-ink dark:text-white truncate">
-                      {seg.title.split('&')[0].trim()}
-                    </p>
-                    {isSelected && (
-                      <span className="w-2 h-2 rounded-full bg-growth shrink-0 animate-pulse" />
-                    )}
-                  </div>
-                  <p className="text-[10px] text-ink-muted dark:text-slate-400 truncate mt-0.5">
-                    {seg.description}
-                  </p>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Mensagem de Feedback */}
+    <div className="space-y-6 pb-8 min-w-0">
+      {/* Toast Mobile-Safe */}
       {statusMessage.text && (
-        <div className={`p-4 rounded-2xl flex items-center gap-3 text-sm animate-in fade-in ${
-          statusMessage.type === 'success' 
-            ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800' 
-            : 'bg-rose-50 dark:bg-rose-950/60 text-rose-800 dark:text-rose-300 border border-rose-200 dark:border-rose-800'
-        }`}>
-          <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-          <span className="font-medium">{statusMessage.text}</span>
+        <div
+          className={`fixed top-4 left-4 right-4 sm:left-auto sm:top-auto sm:bottom-6 sm:right-6 z-50 flex items-center gap-3 px-4 py-3.5 rounded-2xl shadow-xl text-white text-xs sm:text-sm font-semibold animate-in fade-in ${
+            statusMessage.type === 'error' ? 'bg-rose-600' : 'bg-emerald-600'
+          }`}
+        >
+          {statusMessage.type === 'error' ? (
+            <AlertCircle className="w-5 h-5 shrink-0" />
+          ) : (
+            <CheckCircle2 className="w-5 h-5 shrink-0" />
+          )}
+          <span className="flex-1">{statusMessage.text}</span>
         </div>
       )}
 
-      {/* Grid de Serviços */}
+      {/* Cabeçalho Enxuto */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-line dark:border-slate-800">
+        <div className="flex items-center gap-3 min-w-0">
+          <SegmentIconBadge segmentId={safeSegment} size="md" />
+          <div className="min-w-0">
+            <h1 className="font-heading text-2xl sm:text-3xl font-extrabold text-ink dark:text-white tracking-tight leading-tight">
+              Serviços & <span className="text-growth">Preços</span>
+            </h1>
+            <p className="text-ink-soft dark:text-slate-400 text-xs sm:text-sm mt-0.5">
+              {activeServices.length}{' '}
+              {activeServices.length === 1 ? 'opção ativa' : 'opções ativas'} no seu WhatsApp
+            </p>
+          </div>
+        </div>
+
+        <Button
+          onClick={openCreateModal}
+          variant="primary"
+          size="md"
+          style={themeColor ? { backgroundColor: themeColor } : undefined}
+          className="w-full sm:w-auto min-h-11 font-bold"
+        >
+          <Plus className="w-4 h-4 shrink-0" />
+          <span>Adicionar Serviço</span>
+        </Button>
+      </div>
+
+      {/* BARRA COMPACTA DE RAMO DE ATUAÇÃO (Recolhível para não poluir a tela no celular) */}
+      <div className="bg-surface dark:bg-slate-900 border border-line dark:border-slate-800 rounded-2xl p-3.5 sm:px-5 shadow-soft space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <span className="text-xs text-ink-soft dark:text-slate-400">Ramo atual:</span>
+            <span className="font-heading text-xs sm:text-sm font-bold text-brand dark:text-blue-400 truncate">
+              {segmentObj.title}
+            </span>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setShowSegmentPicker((v) => !v)}
+            className="min-h-9 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-canvas dark:bg-slate-800 border border-line dark:border-slate-700 text-xs font-semibold text-ink dark:text-slate-200 hover:border-brand/40 cursor-pointer"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 text-brand ${isSyncing ? 'animate-spin' : ''}`} />
+            <span>Trocar ramo ou carregar sugestões</span>
+            <ChevronDown
+              className={`w-3.5 h-3.5 transition-transform ${
+                showSegmentPicker ? 'rotate-180' : ''
+              }`}
+            />
+          </button>
+        </div>
+
+        {showSegmentPicker && (
+          <div className="pt-2 border-t border-line/70 dark:border-slate-800 space-y-2.5 animate-in fade-in">
+            <p className="text-xs text-ink-soft dark:text-slate-400">
+              Escolha um ramo abaixo se quiser carregar uma lista pronta de procedimentos sugeridos:
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
+              {SEGMENTS.map((seg) => {
+                const isSelected = seg.id === safeSegment;
+                return (
+                  <button
+                    key={seg.id}
+                    type="button"
+                    disabled={isSyncing}
+                    onClick={() => setConfirmSyncSeg(seg)}
+                    className={`group text-left p-3 rounded-2xl border transition-all flex items-center gap-2.5 cursor-pointer min-w-0 ${
+                      isSelected
+                        ? 'border-brand bg-brand-soft/60 dark:bg-blue-950/40 ring-1 ring-brand/20'
+                        : 'border-line dark:border-slate-800 bg-canvas/60 dark:bg-slate-800/40 hover:border-brand/40'
+                    }`}
+                  >
+                    <SegmentIconBadge segmentId={seg.id} size="xs" />
+                    <div className="min-w-0 flex-1">
+                      <p className="font-heading text-xs font-bold text-ink dark:text-white truncate">
+                        {seg.title.split('&')[0].trim()}
+                      </p>
+                      <p className="text-[10px] text-ink-muted dark:text-slate-400 truncate">
+                        {seg.description}
+                      </p>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* LISTA DE SERVIÇOS */}
       {loading ? (
-        <div className="bg-surface dark:bg-slate-900 rounded-2xl border border-line dark:border-slate-800 p-16 text-center flex flex-col items-center justify-center">
-          <div className="w-10 h-10 border-4 border-brand/30 border-t-brand rounded-full animate-spin mb-4"></div>
-          <p className="text-ink-soft dark:text-slate-400 font-medium text-sm">Carregando serviços cadastrados...</p>
+        <div className="bg-surface dark:bg-slate-900 rounded-3xl border border-line dark:border-slate-800 p-14 text-center flex flex-col items-center justify-center">
+          <div className="w-9 h-9 border-4 border-brand/30 border-t-brand rounded-full animate-spin mb-3" />
+          <p className="text-ink-soft dark:text-slate-400 font-medium text-sm">
+            Carregando seu cardápio...
+          </p>
         </div>
       ) : services.length === 0 ? (
-        <div className="bg-surface dark:bg-slate-900 rounded-3xl border border-line dark:border-slate-800 p-12 md:p-16 text-center flex flex-col items-center justify-center shadow-soft">
+        <div className="bg-surface dark:bg-slate-900 rounded-3xl border border-line dark:border-slate-800 p-10 sm:p-14 text-center flex flex-col items-center justify-center shadow-soft">
           <div className="mb-4">
-            <SegmentIconBadge segmentId={segment} size="xl" />
+            <SegmentIconBadge segmentId={safeSegment} size="xl" />
           </div>
-          <h3 className="font-heading text-xl font-bold text-ink dark:text-white">Nenhum serviço cadastrado</h3>
-          <p className="text-ink-soft dark:text-slate-400 mt-1 max-w-sm text-sm">
-            Clique no botão abaixo para carregar os serviços padrão de {segmentObj.title} ou crie um manualmente.
+          <h3 className="font-heading text-lg sm:text-xl font-bold text-ink dark:text-white">
+            Seu cardápio ainda está vazio
+          </h3>
+          <p className="text-ink-soft dark:text-slate-400 mt-1 max-w-sm text-xs sm:text-sm">
+            Carregue sugestões prontas para {segmentObj.title} ou cadastre seu primeiro serviço.
           </p>
-          <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-            <Button 
-              onClick={() => handleSyncSegment(segment)}
+          <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-3 w-full sm:w-auto">
+            <Button
+              onClick={() => executeSyncSegment(safeSegment)}
               variant="primary"
               size="md"
-              style={{ backgroundColor: themeColor || '#2457f5' }}
+              style={themeColor ? { backgroundColor: themeColor } : undefined}
+              className="w-full sm:w-auto min-h-11"
             >
               <RefreshCw className="w-4 h-4" />
-              <span>Carregar Serviços de {segmentObj.title.split('&')[0]}</span>
+              <span>Carregar Sugestões de {segmentObj.title.split('&')[0]}</span>
             </Button>
-            <Button 
-              onClick={() => setIsModalOpen(true)}
+            <Button
+              onClick={openCreateModal}
               variant="outline"
               size="md"
+              className="w-full sm:w-auto min-h-11"
             >
               <Plus className="w-4 h-4" />
-              <span>Criar Manual</span>
+              <span>Criar do Zero</span>
             </Button>
           </div>
         </div>
       ) : (
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {/* Ordena serviços ativos primeiro */}
-          {[...activeServices, ...inactiveServices].map(svc => (
-            <div 
-              key={svc.id} 
-              className={`group min-w-0 bg-surface dark:bg-slate-900 rounded-3xl border transition-all duration-300 p-6 flex flex-col justify-between shadow-soft hover:shadow-lift hover:-translate-y-0.5 ${
-                svc.is_active 
-                  ? 'border-line dark:border-slate-800 hover:border-brand/30' 
-                  : 'border-line/60 dark:border-slate-800/60 opacity-60 bg-slate-50/50 dark:bg-slate-900/50'
+        <div className="grid gap-4 sm:gap-5 md:grid-cols-2 lg:grid-cols-3">
+          {[...activeServices, ...inactiveServices].map((svc) => (
+            <div
+              key={svc.id}
+              className={`group min-w-0 bg-surface dark:bg-slate-900 rounded-3xl border transition-all p-5 flex flex-col justify-between shadow-soft ${
+                svc.is_active
+                  ? 'border-line dark:border-slate-800 hover:border-brand/30'
+                  : 'border-line/60 dark:border-slate-800/60 opacity-65 bg-canvas/60 dark:bg-slate-900/50'
               }`}
             >
-              <div>
-                {/* Topo do Card com Ícone Neural do Procedimento + Status */}
-                <div className="flex items-start justify-between gap-3 mb-4">
-                  <div className="flex items-center gap-3.5 min-w-0">
-                    <ServiceIconBadge serviceName={svc.name} segmentId={segment} size="lg" />
+              <div className="space-y-4">
+                <div className="flex items-start justify-between gap-2.5">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <ServiceIconBadge
+                      serviceName={svc.name}
+                      segmentId={safeSegment}
+                      size="md"
+                    />
                     <div className="min-w-0">
-                      <ServiceCategoryPill serviceName={svc.name} segmentId={segment} className="mb-1.5" />
-                      <h3 className="font-heading text-base sm:text-lg font-bold text-ink dark:text-white leading-snug break-words">
+                      <ServiceCategoryPill
+                        serviceName={svc.name}
+                        segmentId={safeSegment}
+                        className="mb-1"
+                      />
+                      <h3 className="font-heading text-base font-bold text-ink dark:text-white leading-snug break-words">
                         {svc.name}
                       </h3>
                     </div>
                   </div>
 
-                  <button 
+                  <button
+                    type="button"
                     onClick={() => toggleServiceStatus(svc)}
-                    className={`shrink-0 text-[11px] font-bold px-2.5 py-1 rounded-full border transition-all cursor-pointer ${
-                      svc.is_active 
-                        ? 'bg-growth-soft dark:bg-emerald-950/60 text-growth-text dark:text-emerald-400 border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100' 
-                        : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:bg-slate-200'
+                    title={svc.is_active ? 'Toque para pausar' : 'Toque para ativar'}
+                    className={`shrink-0 min-h-8 text-[11px] font-bold px-2.5 py-1 rounded-full border transition-all cursor-pointer ${
+                      svc.is_active
+                        ? 'bg-growth-soft dark:bg-emerald-950/60 text-growth-text dark:text-emerald-400 border-emerald-200 dark:border-emerald-800'
+                        : 'bg-canvas dark:bg-slate-800 text-ink-muted dark:text-slate-400 border-line dark:border-slate-700'
                     }`}
                   >
                     {svc.is_active ? '● Ativo' : '○ Pausado'}
                   </button>
                 </div>
 
-                {/* Valor em Destaque */}
-                <div className="flex items-baseline justify-between mb-4 pt-1">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-ink-muted dark:text-slate-500">
-                    Investimento
-                  </span>
-                  <div className="font-heading text-2xl font-extrabold text-growth dark:text-emerald-400 tracking-tight">
-                    R$ {parseFloat(svc.price).toFixed(2).replace('.', ',')}
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between gap-2 text-xs font-medium text-ink-soft dark:text-slate-300 bg-canvas dark:bg-slate-800/60 p-3 rounded-2xl border border-line/70 dark:border-slate-700/60 mb-4">
-                  <div className="flex items-center gap-1.5">
+                {/* Preço e Tempo Limpos e Diretos */}
+                <div className="flex items-center justify-between bg-canvas dark:bg-slate-800/60 px-3.5 py-3 rounded-2xl border border-line/60 dark:border-slate-700/60">
+                  <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-ink-soft dark:text-slate-300">
                     <Clock className="w-4 h-4 text-brand dark:text-blue-400 shrink-0" />
-                    <span>Duração: <strong className="text-ink dark:text-white">{svc.duration_minutes} min</strong></span>
-                  </div>
-                  <span className="text-[11px] font-semibold text-growth-text dark:text-emerald-400">
-                    ⚡ Auto-agenda
+                    {svc.duration_minutes} min
+                  </span>
+                  <span className="font-heading text-xl font-extrabold text-growth-text dark:text-emerald-400">
+                    R$ {parseFloat(svc.price).toFixed(2).replace('.', ',')}
                   </span>
                 </div>
               </div>
 
-              <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
-                <button 
-                  onClick={() => toggleServiceStatus(svc)}
-                  className="text-brand dark:text-blue-400 hover:text-brand-hover dark:hover:text-blue-300 font-semibold cursor-pointer"
+              {/* Ações: Editar / Ativar-Pausar / Excluir */}
+              <div className="pt-3.5 mt-4 border-t border-line/70 dark:border-slate-800 flex items-center justify-between gap-2">
+                <button
+                  type="button"
+                  onClick={() => openEditModal(svc)}
+                  className="min-h-10 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-canvas dark:bg-slate-800 hover:bg-brand-soft/60 text-xs font-bold text-ink dark:text-slate-200 hover:text-brand transition-colors cursor-pointer"
                 >
-                  {svc.is_active ? 'Desativar no Bot' : 'Reativar no Bot'}
+                  <Edit3 className="w-3.5 h-3.5" />
+                  <span>Editar preço / nome</span>
                 </button>
 
                 <button
+                  type="button"
                   onClick={() => handleDeleteService(svc.id)}
-                  title="Excluir procedimento"
-                  className="p-1.5 text-slate-400 hover:text-danger dark:hover:text-rose-400 rounded-lg hover:bg-danger-soft/50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
+                  title="Excluir serviço"
+                  className="size-10 inline-flex items-center justify-center text-slate-400 hover:text-rose-600 rounded-xl hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>
@@ -353,83 +402,136 @@ export default function Services() {
         </div>
       )}
 
-      {/* Modal Novo Serviço */}
+      {/* MODAL CRIAR / EDITAR SERVIÇO */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200 border border-slate-100 dark:border-slate-800">
-            <div className="flex justify-between items-center p-6 border-b border-slate-100 dark:border-slate-800 bg-gradient-to-r from-blue-50/50 to-white dark:from-slate-800 dark:to-slate-900">
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
+          <div className="bg-surface dark:bg-slate-900 rounded-t-3xl sm:rounded-3xl shadow-2xl w-full sm:max-w-md overflow-hidden animate-in slide-in-from-bottom-4 duration-200 border border-line dark:border-slate-800">
+            <div className="flex justify-between items-center p-5 border-b border-line dark:border-slate-800">
               <div>
-                <h3 className="font-bold text-lg text-slate-900 dark:text-white">Novo Procedimento</h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Defina o nome, duração e valor cobrado</p>
+                <h3 className="font-heading font-bold text-lg text-ink dark:text-white">
+                  {editingService ? 'Editar Serviço' : 'Novo Serviço'}
+                </h3>
+                <p className="text-xs text-ink-soft dark:text-slate-400 mt-0.5">
+                  Defina o nome, tempo médio e valor cobrado
+                </p>
               </div>
-              <button 
-                onClick={() => setIsModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              <button
+                type="button"
+                onClick={() => {
+                  setIsModalOpen(false);
+                  setEditingService(null);
+                }}
+                className="size-9 inline-flex items-center justify-center text-slate-400 hover:text-slate-600 rounded-xl hover:bg-canvas dark:hover:bg-slate-800 cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
-            
-            <form onSubmit={handleCreateService} className="p-6 space-y-4">
+
+            <form onSubmit={handleSaveService} className="p-5 space-y-4">
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
-                  Nome do Procedimento
+                <label className="block text-xs font-bold uppercase tracking-wider text-ink-soft dark:text-slate-400 mb-1.5">
+                  Nome do Serviço
                 </label>
-                <input 
-                  type="text" 
-                  name="name" 
-                  required 
-                  placeholder={segment === 'barbearia' ? 'Ex: Corte Degradê Navalhado' : 'Ex: Manicure e Esmaltação'}
-                  className="w-full px-3.5 py-2.5 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-medium" 
+                <input
+                  type="text"
+                  name="name"
+                  required
+                  defaultValue={editingService?.name || ''}
+                  placeholder={
+                    safeSegment === 'barbearia'
+                      ? 'Ex: Corte Degradê'
+                      : 'Ex: Pé e Mão Completo'
+                  }
+                  className="w-full min-h-11 px-3.5 py-2.5 text-base sm:text-sm bg-canvas dark:bg-slate-800 border border-line dark:border-slate-700 text-ink dark:text-white rounded-xl focus:outline-none focus:border-brand font-medium"
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
-                    Preço (R$)
+                  <label className="block text-xs font-bold uppercase tracking-wider text-ink-soft dark:text-slate-400 mb-1.5">
+                    Valor (R$)
                   </label>
-                  <input 
-                    type="number" 
-                    step="0.50" 
-                    name="price" 
-                    required 
-                    placeholder="45.00" 
-                    className="w-full px-3.5 py-2.5 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-medium" 
+                  <input
+                    type="number"
+                    step="0.50"
+                    name="price"
+                    required
+                    defaultValue={editingService?.price ?? ''}
+                    placeholder="45.00"
+                    className="w-full min-h-11 px-3.5 py-2.5 text-base sm:text-sm bg-canvas dark:bg-slate-800 border border-line dark:border-slate-700 text-ink dark:text-white rounded-xl focus:outline-none focus:border-brand font-medium"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-ink-soft dark:text-slate-400 mb-1.5">
                     Duração (min)
                   </label>
-                  <input 
-                    type="number" 
-                    step="5" 
-                    name="duration_minutes" 
-                    required 
-                    defaultValue="45" 
-                    className="w-full px-3.5 py-2.5 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-medium" 
+                  <input
+                    type="number"
+                    step="5"
+                    name="duration_minutes"
+                    required
+                    defaultValue={editingService?.duration_minutes ?? 45}
+                    className="w-full min-h-11 px-3.5 py-2.5 text-base sm:text-sm bg-canvas dark:bg-slate-800 border border-line dark:border-slate-700 text-ink dark:text-white rounded-xl focus:outline-none focus:border-brand font-medium"
                   />
                 </div>
               </div>
 
-              <div className="pt-4 flex gap-3">
-                <button 
-                  type="button" 
-                  onClick={() => setIsModalOpen(false)}
-                  className="flex-1 py-3 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 font-semibold text-xs transition-colors cursor-pointer"
+              <div className="pt-2 flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsModalOpen(false);
+                    setEditingService(null);
+                  }}
+                  className="flex-1 min-h-11 py-2.5 border border-line dark:border-slate-700 rounded-xl text-ink-soft dark:text-slate-400 font-semibold text-xs sm:text-sm cursor-pointer"
                 >
                   Cancelar
                 </button>
-                <button 
-                  type="submit" 
-                  style={{ backgroundColor: themeColor || '#2563eb' }}
-                  className="flex-1 py-3 text-white font-semibold text-xs rounded-xl shadow-lg shadow-blue-500/25 active:scale-[0.98] transition-all cursor-pointer hover:opacity-90"
+                <button
+                  type="submit"
+                  style={{ backgroundColor: themeColor || '#2457f5' }}
+                  className="flex-1 min-h-11 py-2.5 text-white font-bold text-xs sm:text-sm rounded-xl shadow-md cursor-pointer hover:opacity-95"
                 >
-                  Salvar Procedimento
+                  {editingService ? 'Salvar Alterações' : 'Adicionar'}
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE CONFIRMAÇÃO ANTES DE RECARREGAR CATÁLOGO DO RAMO */}
+      {confirmSyncSeg && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="bg-surface dark:bg-slate-900 rounded-3xl shadow-2xl w-full max-w-sm p-6 border border-line dark:border-slate-800 space-y-4 animate-in fade-in zoom-in-95">
+            <div className="flex justify-center">
+              <SegmentIconBadge segmentId={confirmSyncSeg.id} size="lg" />
+            </div>
+            <div className="text-center">
+              <h3 className="font-heading font-extrabold text-base text-ink dark:text-white">
+                Carregar cardápio de {confirmSyncSeg.title}?
+              </h3>
+              <p className="text-xs text-ink-soft dark:text-slate-400 mt-1 leading-relaxed">
+                Isso adiciona as sugestões padrão deste ramo para você personalizar como preferir.
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-3 pt-1">
+              <button
+                type="button"
+                onClick={() => setConfirmSyncSeg(null)}
+                className="min-h-11 py-2.5 rounded-xl border border-line dark:border-slate-700 text-xs font-semibold text-ink dark:text-slate-300 cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => executeSyncSegment(confirmSyncSeg.id)}
+                style={{ backgroundColor: themeColor || '#2457f5' }}
+                className="min-h-11 py-2.5 rounded-xl text-white text-xs font-bold cursor-pointer"
+              >
+                Sim, carregar
+              </button>
+            </div>
           </div>
         </div>
       )}
