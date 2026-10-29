@@ -113,7 +113,18 @@ export const useAppStore = create(
         // 1. Camada 1: Supabase Auth Server (sempre busca dados frescos via getUser)
         if (isSupabaseConfigured()) {
           try {
+            const { data: sessionData } = await supabase.auth.getSession();
+            if (!sessionData?.session) {
+              // Evita chamadas desnecessárias ou loops de refresh quando não há sessão ativa no Supabase
+              throw new Error('NO_ACTIVE_SUPABASE_SESSION');
+            }
             const { data: userData, error: userFetchErr } = await supabase.auth.getUser();
+            if (userFetchErr) {
+              // Se o token salvo expirou definitivamente ou projeto mudou, limpa apenas o token local inválido
+              if (/refresh_token|invalid|jwt/i.test(userFetchErr.message || '')) {
+                try { await supabase.auth.signOut({ scope: 'local' }); } catch {}
+              }
+            }
             const user = userData?.user;
             if (user) {
               currentUserId = user.id;

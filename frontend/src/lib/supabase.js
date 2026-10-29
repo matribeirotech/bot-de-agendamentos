@@ -13,4 +13,10 @@ export const isSupabaseConfigured = () => {
   );
 };
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: isSupabaseConfigured(),
+    autoRefreshToken: isSupabaseConfigured(),
+    detectSessionInUrl: isSupabaseConfigured(),
+  },
+});

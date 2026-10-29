@@ -143,18 +143,69 @@ let currentQR = '';
 let isConnected = false;
 let waSocket = null;
 
-// Servidor HTTP para expor status, contatos salvos e QR Code
-http.createServer((req, res) => {
+// Utilitário auxiliar para leitura de JSON no servidor HTTP nativo
+function readJsonBody(req) {
+    return new Promise((resolve, reject) => {
+        let body = '';
+        req.on('data', chunk => { body += chunk; });
+        req.on('end', () => {
+            try {
+                resolve(body ? JSON.parse(body) : {});
+            } catch (err) {
+                reject(err);
+            }
+        });
+        req.on('error', reject);
+    });
+}
+
+// Resolve o JID real do WhatsApp tratando DDI 55 e variações do 9º dígito no Brasil
+async function resolveWhatsAppJid(rawPhone) {
+    if (!rawPhone) return null;
+    let digits = String(rawPhone).replace(/\D/g, '');
+    if (!digits) return null;
+
+    // Se vier um LID já mapeado para telefone real, converte antes
+    if (lidToPhoneMap.has(digits)) {
+        digits = String(lidToPhoneMap.get(digits)).replace(/\D/g, '');
+    }
+
+    // Adiciona DDI 55 caso seja número nacional (DDD + 8 ou 9 dígitos)
+    if (digits.length === 10 || digits.length === 11) {
+        digits = `55${digits}`;
+    }
+
+    const candidates = normalizeBRPhone(digits);
+    if (waSocket && isConnected && typeof waSocket.onWhatsApp === 'function') {
+        for (const candidate of candidates) {
+            try {
+                const check = await waSocket.onWhatsApp(`${candidate}@s.whatsapp.net`);
+                if (Array.isArray(check) && check.length > 0 && check[0]?.exists && check[0]?.jid) {
+                    return check[0].jid;
+                }
+            } catch (e) {
+                // Prossegue para o fallback padrão caso a verificação falhe
+            }
+        }
+    }
+
+    return `${candidates[0] || digits}@s.whatsapp.net`;
+}
+
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Servidor HTTP para expor status, contatos salvos, QR Code e disparos de mensagens
+http.createServer(async (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
     if (req.method === 'OPTIONS') {
         res.writeHead(200);
         return res.end();
     }
 
-    if (req.url === '/status') {
+    if (req.url === '/status' && req.method === 'GET') {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ 
             connected: isConnected, 
@@ -168,30 +219,137 @@ http.createServer((req, res) => {
             contacts: Object.fromEntries(savedContactsMap) 
         }));
     } else if (req.url === '/contacts/add' && req.method === 'POST') {
-        let body = '';
-        req.on('data', chunk => { body += chunk; });
-        req.on('end', () => {
-            try {
-                const data = JSON.parse(body);
-                if (data.phone && data.name) {
-                    registerSavedContact(data.phone, data.name);
-                    res.writeHead(200, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ success: true, message: `Contato ${data.name} (${data.phone}) adicionado como salvo!` }));
-                } else {
-                    res.writeHead(400, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ error: 'Campos phone e name são obrigatórios.' }));
-                }
-            } catch (err) {
+        try {
+            const data = await readJsonBody(req);
+            if (data.phone && data.name) {
+                registerSavedContact(data.phone, data.name);
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: true, message: `Contato ${data.name} (${data.phone}) adicionado como salvo!` }));
+            } else {
                 res.writeHead(400, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ error: err.message }));
+                res.end(JSON.stringify({ error: 'Campos phone e name são obrigatórios.' }));
             }
-        });
+        } catch (err) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: err.message }));
+        }
+    } else if (req.url === '/send' && req.method === 'POST') {
+        try {
+            const data = await readJsonBody(req);
+            const { phone, message } = data;
+            if (!phone || !message || !String(message).trim()) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                return res.end(JSON.stringify({ success: false, error: 'Número e mensagem são obrigatórios.' }));
+            }
+            if (!isConnected || !waSocket) {
+                res.writeHead(503, { 'Content-Type': 'application/json' });
+                return res.end(JSON.stringify({ success: false, connected: false, error: 'WhatsApp desconectado.' }));
+            }
+
+            const jid = await resolveWhatsAppJid(phone);
+            if (!jid) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                return res.end(JSON.stringify({ success: false, error: 'Número de telefone inválido.' }));
+            }
+
+            await waSocket.sendMessage(jid, { text: String(message).trim() });
+            console.log(`📢 [Disparo Individual] Mensagem enviada para ${jid}`);
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: true, phone, jid, timestamp: new Date().toISOString() }));
+        } catch (err) {
+            console.error('❌ [Erro em /send]:', err.message);
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: false, error: err.message }));
+        }
+    } else if (req.url === '/broadcast' && req.method === 'POST') {
+        try {
+            const data = await readJsonBody(req);
+            const recipients = Array.isArray(data.recipients) ? data.recipients : [];
+            const delayMs = Math.max(600, Math.min(Number(data.delayMs) || 1100, 4000));
+
+            if (recipients.length === 0) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                return res.end(JSON.stringify({ success: false, error: 'Nenhum destinatário informado.' }));
+            }
+            if (!isConnected || !waSocket) {
+                res.writeHead(503, { 'Content-Type': 'application/json' });
+                return res.end(JSON.stringify({ success: false, connected: false, error: 'WhatsApp desconectado.' }));
+            }
+
+            const results = [];
+            let sentCount = 0;
+            let failedCount = 0;
+
+            for (let i = 0; i < recipients.length; i++) {
+                const item = recipients[i];
+                const phone = item?.phone || item?.phone_number;
+                const text = String(item?.message || '').trim();
+                const name = item?.name || item?.full_name || 'Cliente';
+
+                if (!phone || !text) {
+                    failedCount++;
+                    results.push({ phone, name, status: 'failed', error: 'Dados incompletos' });
+                    continue;
+                }
+
+                try {
+                    const jid = await resolveWhatsAppJid(phone);
+                    if (!jid) throw new Error('Número inválido');
+                    await waSocket.sendMessage(jid, { text });
+                    sentCount++;
+                    results.push({ phone, name, jid, status: 'sent' });
+                    console.log(`📢 [Campanha ${i + 1}/${recipients.length}] Enviado para ${name} (${jid})`);
+                } catch (sendErr) {
+                    failedCount++;
+                    results.push({ phone, name, status: 'failed', error: sendErr.message });
+                    console.error(`⚠️ [Campanha Falha] ${name} (${phone}): ${sendErr.message}`);
+                }
+
+                if (i < recipients.length - 1) {
+                    const jitter = Math.floor(Math.random() * 350);
+                    await sleep(delayMs + jitter);
+                }
+            }
+
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({
+                success: true,
+                total: recipients.length,
+                sentCount,
+                failedCount,
+                results
+            }));
+        } catch (err) {
+            console.error('❌ [Erro em /broadcast]:', err.message);
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: false, error: err.message }));
+        }
+    } else if (req.url === '/reconnect' && req.method === 'POST') {
+        try {
+            isConnected = false;
+            currentQR = '';
+            if (waSocket) {
+                try { await waSocket.logout(); } catch (e) {}
+            }
+            const files = fs.readdirSync(AUTH_DIR);
+            for (const f of files) {
+                if (f !== 'saved_contacts.json' && f !== 'lid_map.json') {
+                    try { fs.unlinkSync(path.join(AUTH_DIR, f)); } catch (e) {}
+                }
+            }
+            setTimeout(connectToWhatsApp, 1200);
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: true, message: 'Gerando novo QR Code...' }));
+        } catch (err) {
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: false, error: err.message }));
+        }
     } else {
         res.writeHead(404);
         res.end();
     }
 }).listen(3001, () => {
-    console.log('🔌 API do Worker rodando na porta 3001 (disponível para o frontend)');
+    console.log('🔌 API do Worker rodando na porta 3001 (disponível para o frontend e backend)');
 });
 
 // Função utilitária para extrair texto de qualquer tipo de mensagem do WhatsApp

@@ -42,7 +42,7 @@ export function evaluatePasswordStrength(password = '') {
   else feedback.push('Pelo menos um número');
 
   if (hasSpecial) score += 1;
-  else feedback.push('Pelo menos um caractere especial (!@#$...)');
+  else feedback.push('Pelo menos um símbolo (ex: @, #, !)');
 
   // 3. Bloqueio de senhas comuns óbvias
   const commonPasswords = ['123456', '12345678', 'password', 'senha123', 'admin123', 'manicure123', 'salao123'];
@@ -101,7 +101,7 @@ export function evaluatePasswordStrength(password = '') {
         color: 'bg-emerald-50 text-emerald-700 border-emerald-200',
         barColor: 'bg-emerald-500',
         width: '100%',
-        feedback: ['Excelente! Senha resistente a ataques de força bruta.'],
+        feedback: ['Excelente! Sua senha está bem protegida.'],
         isValid: true
       };
   }

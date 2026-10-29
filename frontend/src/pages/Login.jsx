@@ -2,364 +2,266 @@ import { useState } from 'react';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAppStore } from '../store/useAppStore';
-import { 
-  Sparkles, CheckCircle2, Lock, Mail, User, Phone, 
-  Building2, ArrowRight, ShieldCheck, AlertCircle, KeyRound
+import {
+  Sparkles,
+  CheckCircle2,
+  Lock,
+  Mail,
+  ArrowRight,
+  ShieldCheck,
+  AlertCircle,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
-import { evaluatePasswordStrength, generateStrongPassword, BotDefense } from '../lib/security';
+import { BotDefense } from '../lib/security';
+
+function translateAuthError(rawMessage = '') {
+  const msg = String(rawMessage || '').toLowerCase();
+  if (msg.includes('invalid login credentials') || msg.includes('invalid_credentials')) {
+    return 'E-mail ou senha incorretos. Confira seus dados e tente novamente.';
+  }
+  if (msg.includes('email not confirmed')) {
+    return 'Confirme o link enviado para o seu e-mail antes de entrar.';
+  }
+  if (msg.includes('too many requests') || msg.includes('rate limit')) {
+    return 'Muitas tentativas seguidas. Aguarde alguns instantes e tente novamente.';
+  }
+  if (msg.includes('failed to fetch') || msg.includes('network')) {
+    return 'Sem conexão no momento. Verifique sua internet e tente novamente.';
+  }
+  return 'Não foi possível entrar na sua conta. Confira seu e-mail e senha.';
+}
 
 export default function Login() {
-  const [isSignUp, setIsSignUp] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
-  const [successMsg, setSuccessMsg] = useState('');
-  
-  const navigate = useNavigate();
+  const [showPassword, setShowPassword] = useState(false);
 
-  // Form states
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [fullName, setFullName] = useState('');
-  const [salonName, setSalonName] = useState('');
-  const [whatsapp, setWhatsapp] = useState('');
   const [honeypot, setHoneypot] = useState('');
 
-  const passwordEvaluation = evaluatePasswordStrength(password);
-
-  const handleSuggestPassword = () => {
-    const generated = generateStrongPassword(16);
-    setPassword(generated);
-  };
+  const navigate = useNavigate();
 
   const handleAuth = async (e) => {
     e.preventDefault();
     setLoading(true);
     setErrorMsg('');
-    setSuccessMsg('');
 
-    // Trava de Segurança Anti-Bot
     if (BotDefense.isHoneypotTriggered(honeypot)) {
-      setErrorMsg("Tentativa de submissão automatizada bloqueada pelo sistema de segurança.");
+      setErrorMsg('Não foi possível concluir o acesso agora. Tente novamente.');
       setLoading(false);
       return;
     }
+
+    const cleanEmail = email.trim().toLowerCase();
 
     if (!isSupabaseConfigured()) {
-      setErrorMsg("⚠️ Chave do Supabase ausente! Abra o arquivo 'frontend/.env', cole a sua 'anon public key' e reinicie o Vite com 'npm run dev'.");
+      if (import.meta.env.DEV) {
+        console.warn('[Zenda Dev] Supabase não configurado no .env; autenticando em modo local.');
+      }
+      await useAppStore.getState().loadUserProfile(cleanEmail);
+      useAppStore.getState().setBusinessData({
+        email: cleanEmail,
+        isAuthenticated: true,
+        isOnboarded: true,
+      });
       setLoading(false);
-      return;
-    }
-
-    if (isSignUp && !passwordEvaluation.isValid) {
-      setErrorMsg("Por favor, escolha uma senha mais forte com pelo menos 8 caracteres.");
-      setLoading(false);
+      navigate('/');
       return;
     }
 
     try {
-      if (isSignUp) {
-        // Cadastro no Supabase Auth com metadados para popular a tabela 'usuarios' e criar o Trial de 30 dias
-        const { data, error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: {
-              nome_completo: fullName,
-              nome_salao: salonName,
-              whatsapp: whatsapp
-            }
-          }
-        });
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: cleanEmail,
+        password,
+      });
 
-        if (error) throw error;
+      if (error) throw error;
 
-        if (data?.user) {
-          await useAppStore.getState().saveUserProfile({
-            email,
-            responsibleName: fullName,
-            businessName: salonName,
-            whatsapp: whatsapp
-          });
-        }
+      const loggedEmail = data?.user?.email || cleanEmail;
+      await useAppStore.getState().loadUserProfile(loggedEmail, data?.user?.id);
+      useAppStore.getState().setBusinessData({
+        email: loggedEmail,
+        isAuthenticated: true,
+        isOnboarded: true,
+      });
 
-        setSuccessMsg("Conta criada com sucesso! Você ganhou 30 dias de acesso Pro grátis. Redirecionando...");
-        setTimeout(() => navigate('/'), 2000);
-      } else {
-        // Login com e-mail e senha
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email,
-          password
-        });
-
-        if (error) throw error;
-
-        // Sincroniza imediatamente o perfil do usuário logado
-        const loggedEmail = data?.user?.email || email;
-        await useAppStore.getState().loadUserProfile(loggedEmail, data?.user?.id);
-
-        navigate('/');
-      }
+      navigate('/');
     } catch (error) {
-      console.error(error);
-      setErrorMsg(error.message || "Falha na autenticação. Verifique os dados inseridos.");
+      if (import.meta.env.DEV) {
+        console.error(error);
+      }
+      setErrorMsg(translateAuthError(error?.message));
     } finally {
       setLoading(false);
     }
   };
 
   const handleGoogleLogin = async () => {
+    setErrorMsg('');
+
+    if (!isSupabaseConfigured()) {
+      setErrorMsg('Use seu e-mail e senha abaixo para entrar na sua conta.');
+      return;
+    }
+
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: window.location.origin
-        }
+          redirectTo: window.location.origin,
+        },
       });
       if (error) throw error;
     } catch (error) {
-      setErrorMsg("Erro ao conectar com o Google: " + error.message);
+      if (import.meta.env.DEV) {
+        console.error(error);
+      }
+      setErrorMsg('Não foi possível entrar com o Google agora. Tente com seu e-mail.');
     }
   };
 
   return (
-    <div className="min-h-screen bg-canvas flex flex-col justify-center py-12 sm:px-6 lg:px-8 font-sans">
-      {/* Container Centralizado */}
-      <div className="sm:mx-auto sm:w-full sm:max-w-md text-center px-4">
-        {/* Logo Oficial Zenda by Lypsyos */}
-        <Link to="/" className="inline-flex items-center gap-3.5 group mb-4">
+    <div className="min-h-screen bg-canvas dark:bg-slate-950 flex flex-col justify-center py-8 sm:py-12 px-4 sm:px-6 lg:px-8 font-sans">
+      {/* Cabeçalho Compacto Mobile-First */}
+      <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
+        <Link to="/" className="inline-flex items-center gap-3 group mb-4">
           <img
             src="/logo-lypsyos-zenda-r1.svg"
             alt="Zenda"
-            className="w-13 h-13 rounded-2xl object-contain bg-surface p-1 shadow-md border border-line group-hover:scale-105 transition-transform"
+            className="w-12 h-12 rounded-2xl object-contain bg-surface dark:bg-slate-900 p-1 shadow-sm border border-line dark:border-slate-800 group-hover:scale-105 transition-transform"
           />
           <div className="text-left">
-            <span className="font-heading text-3xl font-extrabold tracking-tight text-ink block leading-none">
+            <span className="font-heading text-2xl sm:text-3xl font-extrabold tracking-tight text-ink dark:text-white block leading-none">
               Zenda
             </span>
-            <span className="text-[10px] font-bold uppercase tracking-widest text-brand mt-0.5 flex items-center gap-1">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-brand dark:text-blue-400 mt-1 flex items-center gap-1">
               <img src="/logo-oficial.png" alt="Lypsyos" className="w-3.5 h-3.5 object-contain inline" />
-              Powered by Lypsyos
+              by Lypsyos
             </span>
           </div>
         </Link>
 
-        {/* Badge de Trial */}
         <div>
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-growth-soft text-growth-text border border-emerald-200">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-growth-soft dark:bg-emerald-950/50 text-growth-text dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60">
             <Sparkles className="w-3.5 h-3.5 text-growth" />
-            30 Dias de Teste Grátis no Plano Pro
+            30 dias grátis no Plano Profissional
           </span>
         </div>
 
-        <h2 className="mt-4 font-heading text-2xl font-bold tracking-tight text-ink break-words">
-          {isSignUp ? "Crie sua conta profissional" : "Acesse seu painel de gestão"}
-        </h2>
-        <p className="mt-1 text-sm text-ink-soft break-words">
-          {isSignUp 
-            ? "Configure seu robô de atendimento em menos de 2 minutos" 
-            : "Gerencie seus horários, robô e clientes no WhatsApp"}
+        <h1 className="mt-3.5 font-heading text-2xl font-bold tracking-tight text-ink dark:text-white">
+          Entre no seu painel
+        </h1>
+        <p className="mt-1 text-sm text-ink-soft dark:text-slate-400">
+          Acompanhe sua agenda e seus clientes pelo celular
         </p>
       </div>
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-lg px-4">
-        <div className="bg-surface py-8 px-6 sm:px-10 shadow-soft rounded-3xl border border-line">
-          {/* Alerta de Configuração Inicial do Supabase */}
-          {!isSupabaseConfigured() && (
-            <div className="mb-6 p-4 rounded-2xl bg-amber-50 border border-amber-200/80 text-amber-900 text-xs">
-              <div className="flex items-center gap-2 font-bold mb-1">
-                <KeyRound className="w-4 h-4 text-amber-600" />
-                <span>Conexão Supabase Pendente</span>
-              </div>
-              <p className="text-amber-800 leading-relaxed">
-                Cole a sua <strong>anon public key</strong> no arquivo <code className="bg-amber-100/80 px-1.5 py-0.5 rounded font-mono text-[11px]">frontend/.env</code> e reinicie o terminal do Vite (<code className="bg-amber-100/80 px-1.5 py-0.5 rounded font-mono text-[11px]">npm run dev</code>).
-              </p>
-            </div>
-          )}
-
-          {/* Mensagens de Feedback */}
+      {/* Card Principal */}
+      <div className="mt-6 sm:mx-auto sm:w-full sm:max-w-md">
+        <div className="bg-surface dark:bg-slate-900 py-6 px-5 sm:py-8 sm:px-8 shadow-soft rounded-3xl border border-line dark:border-slate-800">
           {errorMsg && (
-            <div className="mb-6 p-4 rounded-2xl bg-rose-50 border border-rose-200 flex items-start gap-3 text-xs text-rose-700 font-medium animate-in fade-in">
-              <AlertCircle className="w-4 h-4 shrink-0 text-rose-600 mt-0.5" />
+            <div className="mb-5 p-3.5 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/60 flex items-start gap-2.5 text-xs text-rose-700 dark:text-rose-300 font-medium">
+              <AlertCircle className="w-4 h-4 shrink-0 text-rose-600 dark:text-rose-400 mt-0.5" />
               <span>{errorMsg}</span>
             </div>
           )}
 
-          {successMsg && (
-            <div className="mb-6 p-4 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-start gap-3 text-xs text-emerald-800 font-medium animate-in fade-in">
-              <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600 mt-0.5" />
-              <span>{successMsg}</span>
-            </div>
-          )}
-
-          {/* Social Login (Google) */}
+          {/* Login com Google */}
           <button
             type="button"
             onClick={handleGoogleLogin}
-            className="w-full flex items-center justify-center gap-3 py-3 px-4 border border-slate-200 rounded-xl text-sm font-semibold text-slate-700 bg-white hover:bg-slate-50 transition-all shadow-2xs hover:border-slate-300 cursor-pointer"
+            className="w-full min-h-11 flex items-center justify-center gap-3 py-2.5 px-4 border border-line dark:border-slate-700 rounded-xl text-sm font-semibold text-ink dark:text-slate-200 bg-surface dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/70 transition-all cursor-pointer"
           >
-            {/* Google Icon SVG */}
-            <svg className="w-4 h-4" viewBox="0 0 24 24">
-              <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"/>
-              <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"/>
-              <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/>
-              <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
+            <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" aria-hidden="true">
+              <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z" />
+              <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z" />
+              <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z" />
+              <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z" />
             </svg>
-            Continuar com o Google
+            Entrar com o Google
           </button>
 
-          <div className="relative my-6">
+          <div className="relative my-5">
             <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-slate-200"></div>
+              <div className="w-full border-t border-line dark:border-slate-800" />
             </div>
-            <div className="relative flex justify-center text-xs uppercase tracking-wider font-semibold">
-              <span className="bg-white px-4 text-slate-400">ou com e-mail</span>
+            <div className="relative flex justify-center text-[11px] uppercase tracking-wider font-semibold">
+              <span className="bg-surface dark:bg-slate-900 px-3 text-ink-muted dark:text-slate-500">
+                ou com seu e-mail
+              </span>
             </div>
           </div>
 
-          {/* Formulário Principal */}
+          {/* Formulário */}
           <form onSubmit={handleAuth} className="space-y-4">
-            {isSignUp && (
-              <>
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
-                    Seu Nome Completo
-                  </label>
-                  <div className="relative">
-                    <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="text"
-                      required
-                      placeholder="Ex: Seu Nome Completo"
-                      value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
-                      className="w-full pl-10 pr-4 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
-                    Nome do Salão ou Espaço
-                  </label>
-                  <div className="relative">
-                    <Building2 className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="text"
-                      required
-                      placeholder="Ex: Studio Bella Unhas"
-                      value={salonName}
-                      onChange={(e) => setSalonName(e.target.value)}
-                      className="w-full pl-10 pr-4 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
-                    WhatsApp Comercial (DDD + Número)
-                  </label>
-                  <div className="relative">
-                    <Phone className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="text"
-                      required
-                      placeholder="(11) 99999-9999"
-                      value={whatsapp}
-                      onChange={(e) => setWhatsapp(e.target.value)}
-                      className="w-full pl-10 pr-4 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all"
-                    />
-                  </div>
-                </div>
-              </>
-            )}
-
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
+              <label className="block text-xs font-bold text-ink dark:text-slate-200 mb-1.5">
                 E-mail
               </label>
               <div className="relative">
-                <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <Mail className="w-4 h-4 text-ink-muted absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <input
                   type="email"
                   required
+                  autoComplete="email"
                   placeholder="voce@exemplo.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all"
+                  className="w-full min-h-11 pl-10 pr-4 py-2.5 text-base sm:text-sm bg-canvas dark:bg-slate-950 text-ink dark:text-white border border-line dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all"
                 />
               </div>
             </div>
 
-            {/* Campo Honeypot invisível para travar bots */}
-            <input 
-              type="text" 
-              name="anti_bot_tax_id" 
-              value={honeypot} 
-              onChange={(e) => setHoneypot(e.target.value)} 
-              tabIndex={-1} 
-              autoComplete="off" 
-              className="hidden" 
-              style={{ display: 'none' }} 
+            <input
+              type="text"
+              name="website_url_confirm"
+              value={honeypot}
+              onChange={(e) => setHoneypot(e.target.value)}
+              tabIndex={-1}
+              autoComplete="off"
+              className="hidden"
+              style={{ display: 'none' }}
             />
 
             <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                  Senha
-                </label>
-                {isSignUp && (
-                  <button
-                    type="button"
-                    onClick={handleSuggestPassword}
-                    className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 hover:text-blue-700 hover:underline cursor-pointer"
-                  >
-                    <Sparkles className="w-3 h-3" />
-                    Sugerir Senha Forte
-                  </button>
-                )}
-              </div>
+              <label className="block text-xs font-bold text-ink dark:text-slate-200 mb-1.5">
+                Senha
+              </label>
               <div className="relative">
-                <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <Lock className="w-4 h-4 text-ink-muted absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <input
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   required
-                  placeholder="••••••••"
+                  autoComplete="current-password"
+                  placeholder="Sua senha"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-mono"
+                  className="w-full min-h-11 pl-10 pr-11 py-2.5 text-base sm:text-sm bg-canvas dark:bg-slate-950 text-ink dark:text-white border border-line dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 w-9 h-9 rounded-lg flex items-center justify-center text-ink-muted hover:text-ink dark:hover:text-white transition-colors cursor-pointer"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
               </div>
-
-              {isSignUp && password && (
-                <div className="mt-2 space-y-1.5">
-                  <div className="flex items-center justify-between text-[11px]">
-                    <span className="text-slate-500 font-medium">Segurança da senha:</span>
-                    <span className={`font-bold px-2 py-0.5 rounded-full text-[10px] ${passwordEvaluation.color}`}>
-                      {passwordEvaluation.label}
-                    </span>
-                  </div>
-                  <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
-                    <div 
-                      className={`h-full transition-all duration-300 ${passwordEvaluation.barColor}`} 
-                      style={{ width: passwordEvaluation.width }}
-                    />
-                  </div>
-                </div>
-              )}
             </div>
 
-            {/* Botão de Envio */}
-            <div className="pt-2">
+            <div className="pt-1">
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm py-3.5 rounded-xl shadow-lg shadow-blue-500/25 active:scale-[0.98] transition-all cursor-pointer disabled:opacity-50"
+                className="w-full min-h-12 flex items-center justify-center gap-2 bg-brand hover:bg-brand-hover text-white font-semibold text-sm py-3.5 rounded-xl shadow-md shadow-brand/20 active:scale-[0.99] transition-all cursor-pointer disabled:opacity-50"
               >
                 {loading ? (
-                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                 ) : (
                   <>
-                    <span>{isSignUp ? "Iniciar 30 Dias Grátis" : "Entrar no Sistema"}</span>
+                    <span>Entrar</span>
                     <ArrowRight className="w-4 h-4" />
                   </>
                 )}
@@ -367,30 +269,33 @@ export default function Login() {
             </div>
           </form>
 
-          {/* Alternar entre Login e Cadastro */}
-          <div className="mt-6 text-center pt-4 border-t border-slate-100">
+          {/* Criar Conta */}
+          <div className="mt-5 pt-4 border-t border-line dark:border-slate-800 text-center">
+            <p className="text-xs text-ink-soft dark:text-slate-400 mb-2.5">
+              Ainda não tem uma conta no Zenda?
+            </p>
             <Link
               to="/onboarding"
-              className="text-xs font-semibold text-blue-600 hover:text-blue-800 transition-colors cursor-pointer"
+              className="w-full min-h-11 inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl border border-brand/25 bg-brand-soft/60 dark:bg-blue-950/40 text-xs font-bold text-brand dark:text-blue-300 hover:bg-brand-soft transition-colors"
             >
-              Ainda não tem conta? Faça o cadastro guiado (30 dias grátis) →
+              Criar minha conta • 30 dias grátis
+              <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>
         </div>
 
-        {/* Garantias / Trust Badges */}
-        <div className="mt-6 flex items-center justify-center gap-6 text-xs text-slate-400 font-medium">
+        {/* Garantias */}
+        <div className="mt-5 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-xs text-ink-muted dark:text-slate-400 font-medium">
           <span className="flex items-center gap-1.5">
-            <ShieldCheck className="w-4 h-4 text-emerald-500" />
+            <ShieldCheck className="w-4 h-4 text-growth" />
             Sem cartão de crédito
           </span>
           <span className="flex items-center gap-1.5">
-            <CheckCircle2 className="w-4 h-4 text-blue-600" />
-            Cancele a qualquer momento
+            <CheckCircle2 className="w-4 h-4 text-brand" />
+            Cancele quando quiser
           </span>
         </div>
       </div>
     </div>
   );
 }
-
